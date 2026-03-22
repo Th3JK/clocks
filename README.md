@@ -12,7 +12,7 @@ A clocks application for the COSMIC™ desktop environment.
 
 ## Localization
 
-Supports English (default), Czech, German, Spanish, and Russian. The app automatically follows system language settings with English as the fallback.
+Supports English (default), Czech, Polish, German, Spanish, and Russian. The app automatically follows system language settings with English as the fallback.
 
 ## Project Structure
 
