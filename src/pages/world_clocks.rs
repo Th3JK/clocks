@@ -186,6 +186,7 @@ impl WorldClocksState {
         let mut col = widget::column::with_capacity(22).spacing(spacing);
 
         let search = widget::text_input(fl!("search-timezone"), &self.search_text)
+            .id(widget::Id::new("world-clocks-search-input"))
             .on_input(Message::SearchChanged)
             .width(Length::Fill);
         col = col.push(search);

@@ -373,7 +373,11 @@ impl TimerState {
         // Label
         col = col.push(widget::text::body(fl!("label")));
         col = col
-            .push(widget::text_input(fl!("timer-label-placeholder"), &self.edit_label).on_input(Message::EditLabel));
+            .push(
+                widget::text_input(fl!("timer-label-placeholder"), &self.edit_label)
+                    .id(widget::Id::new("timer-label-input"))
+                    .on_input(Message::EditLabel),
+            );
 
         // Duration spinners with wrap-around (HH:MM:SS colon format)
         col = col.push(widget::text::body(fl!("duration")));

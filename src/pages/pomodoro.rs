@@ -473,7 +473,9 @@ impl PomodoroState {
             // Editing existing pomodoro timer
             col = col.push(widget::text::title4(fl!("edit-pomodoro")));
             col = col.push(
-                widget::text_input(fl!("label"), &self.edit_label).on_input(Message::EditNewLabel),
+                widget::text_input(fl!("label"), &self.edit_label)
+                    .id(widget::Id::new("pomodoro-label-input"))
+                    .on_input(Message::EditNewLabel),
             );
 
             let w = self.edit_work_minutes;
@@ -550,6 +552,7 @@ impl PomodoroState {
             col = col.push(widget::text::title4(fl!("new-pomodoro")));
             col = col.push(
                 widget::text_input(fl!("label-placeholder-pomodoro"), &self.edit_label)
+                    .id(widget::Id::new("pomodoro-label-input"))
                     .on_input(Message::EditNewLabel),
             );
             col = col.push(widget::button::suggested(fl!("add-timer")).on_press(Message::AddTimer));

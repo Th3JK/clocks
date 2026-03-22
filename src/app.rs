@@ -322,6 +322,10 @@ impl cosmic::Application for AppModel {
                 world_clocks::Message::OpenAddSidebar => {
                     self.context_page = ContextPage::WorldClocksAdd;
                     self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new(
+                        "world-clocks-search-input",
+                    ));
                 }
                 _ => {
                     self.world_clocks.update(msg.clone());
@@ -333,6 +337,8 @@ impl cosmic::Application for AppModel {
                     self.alarm.update(msg.clone(), self.use_12h);
                     self.context_page = ContextPage::AlarmEdit;
                     self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("alarm-label-input"));
                 }
                 alarm::Message::CancelEdit | alarm::Message::SaveAlarm => {
                     self.alarm.update(msg.clone(), self.use_12h);
@@ -361,6 +367,8 @@ impl cosmic::Application for AppModel {
                     self.timer.update(msg.clone());
                     self.context_page = ContextPage::TimerAdd;
                     self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("timer-label-input"));
                 }
                 timer::Message::CancelEdit | timer::Message::SaveTimer => {
                     self.timer.update(msg.clone());
@@ -392,6 +400,8 @@ impl cosmic::Application for AppModel {
                     self.pomodoro.update(msg.clone());
                     self.context_page = ContextPage::PomodoroSettings;
                     self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("pomodoro-label-input"));
                 }
                 pomodoro::Message::CancelEditPomodoro | pomodoro::Message::SaveEditPomodoro => {
                     self.pomodoro.update(msg.clone());

@@ -573,7 +573,11 @@ impl AlarmState {
             // Label
             col = col.push(widget::text::body(fl!("label")));
             col = col
-                .push(widget::text_input(fl!("alarm-label-placeholder"), &edit.label).on_input(Message::EditLabel));
+                .push(
+                    widget::text_input(fl!("alarm-label-placeholder"), &edit.label)
+                        .id(widget::Id::new("alarm-label-input"))
+                        .on_input(Message::EditLabel),
+                );
 
             // Time spinners with wrap-around
             let hour_str = format!("{:02}", edit.hour);
