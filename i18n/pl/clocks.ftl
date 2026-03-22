@@ -1,5 +1,6 @@
 app-title = Zegary
 about = O aplikacji
+settings = Ustawienia
 repository = Repozytorium
 view = Widok
 
@@ -22,6 +23,11 @@ reset = Resetuj
 dismiss = Odrzuć
 snooze = Drzemka
 add = Dodaj
+
+# Settings
+time-format = Format czasu
+time-format-24h = 24-godzinny
+time-format-12h = 12-godzinny (AM/PM)
 
 # Common labels
 label = Etykieta
@@ -81,6 +87,10 @@ snooze-duration = Czas drzemki
 ring-duration = Czas dzwonienia
 new-alarm = Nowy budzik
 edit-alarm = Edytuj budzik
+
+# AM/PM labels
+am = AM
+pm = PM
 
 # Day names (short)
 day-mon = Pon

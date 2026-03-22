@@ -21,6 +21,7 @@ pub enum Page {
 pub enum ContextPage {
     #[default]
     About,
+    Settings,
     WorldClocksAdd,
     StopwatchHistory,
     AlarmEdit,

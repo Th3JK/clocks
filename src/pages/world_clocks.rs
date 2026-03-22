@@ -101,7 +101,7 @@ impl WorldClocksState {
     }
 
     /// Main view: page header + clock list
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = 12;
         let now_utc = Utc::now();
 
@@ -119,7 +119,11 @@ impl WorldClocksState {
 
         for clock in &self.clocks {
             let time_in_tz = now_utc.with_timezone(&clock.timezone);
-            let time_str = time_in_tz.format("%H:%M:%S").to_string();
+            let time_str = if use_12h {
+                time_in_tz.format("%I:%M:%S %p").to_string()
+            } else {
+                time_in_tz.format("%H:%M:%S").to_string()
+            };
 
             let offset_secs = clock
                 .timezone

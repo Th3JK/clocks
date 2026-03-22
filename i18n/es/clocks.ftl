@@ -1,5 +1,6 @@
 app-title = Relojes
 about = Acerca de
+settings = Configuración
 repository = Repositorio
 view = Vista
 
@@ -22,6 +23,11 @@ reset = Reiniciar
 dismiss = Descartar
 snooze = Posponer
 add = Añadir
+
+# Settings
+time-format = Formato de hora
+time-format-24h = 24 horas
+time-format-12h = 12 horas (a.m./p.m.)
 
 # Common labels
 label = Etiqueta
@@ -81,6 +87,10 @@ snooze-duration = Duración de posposición
 ring-duration = Duración del timbre
 new-alarm = Nueva alarma
 edit-alarm = Editar alarma
+
+# AM/PM labels
+am = a.m.
+pm = p.m.
 
 # Day names (short)
 day-mon = Lun

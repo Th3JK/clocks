@@ -1,5 +1,6 @@
 app-title = Hodiny
 about = O aplikaci
+settings = Nastavení
 repository = Úložiště
 view = Zobrazení
 
@@ -22,6 +23,11 @@ reset = Resetovat
 dismiss = Zavřít
 snooze = Odložit
 add = Přidat
+
+# Settings
+time-format = Formát času
+time-format-24h = 24hodinový
+time-format-12h = 12hodinový (AM/PM)
 
 # Common labels
 label = Název
@@ -81,6 +87,10 @@ snooze-duration = Doba odložení
 ring-duration = Doba zvonění
 new-alarm = Nový budík
 edit-alarm = Upravit budík
+
+# AM/PM labels
+am = AM
+pm = PM
 
 # Day names (short)
 day-mon = Po

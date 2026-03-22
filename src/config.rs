@@ -5,7 +5,7 @@ use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::Cosmi
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
-#[version = 2]
+#[version = 3]
 pub struct Config {
     /// Saved world clocks (timezone names)
     pub world_clocks: Vec<SavedClock>,
@@ -17,6 +17,8 @@ pub struct Config {
     pub pomodoros: Vec<SavedPomodoro>,
     /// Pomodoro default durations
     pub pomodoro_defaults: PomodoroDefaults,
+    /// Use 12-hour (AM/PM) time format instead of 24-hour
+    pub use_12h: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

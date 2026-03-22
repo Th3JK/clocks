@@ -1,5 +1,6 @@
 app-title = Часы
 about = О программе
+settings = Настройки
 repository = Репозиторий
 view = Вид
 
@@ -22,6 +23,11 @@ reset = Сброс
 dismiss = Отключить
 snooze = Отложить
 add = Добавить
+
+# Settings
+time-format = Формат времени
+time-format-24h = 24-часовой
+time-format-12h = 12-часовой (AM/PM)
 
 # Common labels
 label = Название
@@ -81,6 +87,10 @@ snooze-duration = Длительность отложения
 ring-duration = Длительность звонка
 new-alarm = Новый будильник
 edit-alarm = Редактировать будильник
+
+# AM/PM labels
+am = AM
+pm = PM
 
 # Day names (short)
 day-mon = Пн

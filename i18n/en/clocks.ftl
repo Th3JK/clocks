@@ -1,5 +1,6 @@
 app-title = Clocks
 about = About
+settings = Settings
 repository = Repository
 view = View
 
@@ -22,6 +23,11 @@ reset = Reset
 dismiss = Dismiss
 snooze = Snooze
 add = Add
+
+# Settings
+time-format = Time Format
+time-format-24h = 24-hour
+time-format-12h = 12-hour (AM/PM)
 
 # Common labels
 label = Label
@@ -81,6 +87,10 @@ snooze-duration = Snooze Duration
 ring-duration = Ring Duration
 new-alarm = New Alarm
 edit-alarm = Edit Alarm
+
+# AM/PM labels
+am = AM
+pm = PM
 
 # Day names (short)
 day-mon = Mon

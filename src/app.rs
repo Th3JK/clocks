@@ -5,7 +5,7 @@ use crate::config::{
     Config, PomodoroDefaults, SavedAlarm, SavedClock, SavedPomodoro, SavedRepeatMode, SavedTimer,
 };
 use crate::fl;
-use crate::pages::{alarm, pomodoro, stopwatch, timer, world_clocks, ContextPage, Page};
+use crate::pages::{ContextPage, Page, alarm, pomodoro, stopwatch, timer, world_clocks};
 use chrono::{Datelike, Local, Timelike};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
@@ -14,8 +14,8 @@ use cosmic::iced::Subscription;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::{iced_futures, prelude::*};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -31,6 +31,7 @@ pub struct AppModel {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     config: Config,
     config_context: Option<cosmic_config::Config>,
+    use_12h: bool,
 
     // Page states (each page owns its own MVU model)
     world_clocks: world_clocks::WorldClocksState,
@@ -57,6 +58,7 @@ pub enum Message {
     Timer(timer::Message),
     Pomodoro(pomodoro::Message),
     CustomSoundSelected(CustomSoundTarget, String),
+    SetTimeFormat(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +71,7 @@ pub enum CustomSoundTarget {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MenuAction {
     About,
+    Settings,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -77,6 +80,7 @@ impl menu::action::MenuAction for MenuAction {
     fn message(&self) -> Self::Message {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
+            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
         }
     }
 }
@@ -152,6 +156,8 @@ impl cosmic::Application for AppModel {
         let timer = restore_timers(&config);
         let pomodoro = restore_pomodoros(&config);
 
+        let use_12h = config.use_12h;
+
         let mut app = AppModel {
             core,
             context_page: ContextPage::default(),
@@ -160,6 +166,7 @@ impl cosmic::Application for AppModel {
             key_binds: HashMap::new(),
             config,
             config_context,
+            use_12h,
             world_clocks,
             stopwatch: stopwatch::StopwatchState::default(),
             alarm,
@@ -179,7 +186,10 @@ impl cosmic::Application for AppModel {
             menu::root(fl!("view")).apply(Element::from),
             menu::items(
                 &self.key_binds,
-                vec![menu::Item::Button(fl!("about"), None, MenuAction::About)],
+                vec![
+                    menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
+                    menu::Item::Button(fl!("about"), None, MenuAction::About),
+                ],
             ),
         )]);
 
@@ -218,7 +228,7 @@ impl cosmic::Application for AppModel {
                     fl!("new-alarm")
                 };
                 context_drawer::context_drawer(
-                    self.alarm.sidebar_view().map(Message::Alarm),
+                    self.alarm.sidebar_view(self.use_12h).map(Message::Alarm),
                     Message::ToggleContextPage(ContextPage::AlarmEdit),
                 )
                 .title(title)
@@ -240,14 +250,22 @@ impl cosmic::Application for AppModel {
                 Message::ToggleContextPage(ContextPage::PomodoroSettings),
             )
             .title(fl!("pomodoro-settings")),
+            ContextPage::Settings => context_drawer::context_drawer(
+                self.settings_view(),
+                Message::ToggleContextPage(ContextPage::Settings),
+            )
+            .title(fl!("settings")),
         })
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
         let content: Element<_> = match self.nav.active_data::<Page>() {
-            Some(Page::WorldClocks) => self.world_clocks.view().map(Message::WorldClocks),
+            Some(Page::WorldClocks) => self
+                .world_clocks
+                .view(self.use_12h)
+                .map(Message::WorldClocks),
             Some(Page::Stopwatch) => self.stopwatch.view().map(Message::Stopwatch),
-            Some(Page::Alarm) => self.alarm.view().map(Message::Alarm),
+            Some(Page::Alarm) => self.alarm.view(self.use_12h).map(Message::Alarm),
             Some(Page::Timer) => self.timer.view().map(Message::Timer),
             Some(Page::Pomodoro) => self.pomodoro.view().map(Message::Pomodoro),
             None => widget::text::body(fl!("select-a-view")).into(),
@@ -312,12 +330,12 @@ impl cosmic::Application for AppModel {
 
             Message::Alarm(ref msg) => match msg {
                 alarm::Message::StartNewAlarm | alarm::Message::StartEditAlarm(_) => {
-                    self.alarm.update(msg.clone());
+                    self.alarm.update(msg.clone(), self.use_12h);
                     self.context_page = ContextPage::AlarmEdit;
                     self.core.window.show_context = true;
                 }
                 alarm::Message::CancelEdit | alarm::Message::SaveAlarm => {
-                    self.alarm.update(msg.clone());
+                    self.alarm.update(msg.clone(), self.use_12h);
                     self.core.window.show_context = false;
                 }
                 alarm::Message::BrowseCustomSound => {
@@ -326,15 +344,15 @@ impl cosmic::Application for AppModel {
                 alarm::Message::SnoozeAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
                     self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone());
+                    self.alarm.update(msg.clone(), self.use_12h);
                 }
                 alarm::Message::DismissAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
                     self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone());
+                    self.alarm.update(msg.clone(), self.use_12h);
                 }
                 _ => {
-                    self.alarm.update(msg.clone());
+                    self.alarm.update(msg.clone(), self.use_12h);
                 }
             },
 
@@ -400,21 +418,25 @@ impl cosmic::Application for AppModel {
             }
 
             Message::UpdateConfig(config) => {
+                self.use_12h = config.use_12h;
                 self.config = config;
             }
 
-            Message::CustomSoundSelected(target, path) => {
-                match target {
-                    CustomSoundTarget::Alarm => {
-                        self.alarm.update(alarm::Message::EditSound(path));
-                    }
-                    CustomSoundTarget::Timer => {
-                        self.timer.update(timer::Message::EditSound(path));
-                    }
-                    CustomSoundTarget::Pomodoro => {
-                        self.pomodoro.update(pomodoro::Message::EditSound(path));
-                    }
+            Message::CustomSoundSelected(target, path) => match target {
+                CustomSoundTarget::Alarm => {
+                    self.alarm
+                        .update(alarm::Message::EditSound(path), self.use_12h);
                 }
+                CustomSoundTarget::Timer => {
+                    self.timer.update(timer::Message::EditSound(path));
+                }
+                CustomSoundTarget::Pomodoro => {
+                    self.pomodoro.update(pomodoro::Message::EditSound(path));
+                }
+            },
+
+            Message::SetTimeFormat(use_12h) => {
+                self.use_12h = use_12h;
             }
 
             Message::LaunchUrl(url) => match open::that_detached(&url) {
@@ -471,7 +493,8 @@ impl AppModel {
         let expired = self.alarm.check_ring_expired();
         for alarm_id in expired {
             self.stop_alarm_audio(alarm_id);
-            self.alarm.update(alarm::Message::SnoozeAlarm(alarm_id));
+            self.alarm
+                .update(alarm::Message::SnoozeAlarm(alarm_id), self.use_12h);
         }
 
         // Alarm: check snoozed alarms that should re-trigger
@@ -509,6 +532,7 @@ impl AppModel {
             &self.alarm,
             &self.timer,
             &self.pomodoro,
+            self.use_12h,
         );
         if let Err(e) = config.write_entry(ctx) {
             eprintln!("Failed to save config: {:?}", e);
@@ -531,6 +555,33 @@ impl AppModel {
         if let Some(stop) = self.alarm_audio_stops.remove(&alarm_id) {
             stop.store(true, Ordering::Relaxed);
         }
+    }
+
+    fn settings_view(&self) -> Element<'_, Message> {
+        let spacing = 12;
+        let mut col = widget::column::with_capacity(4).spacing(spacing);
+
+        col = col.push(widget::text::body(fl!("time-format")));
+
+        let btn_24h = if self.use_12h {
+            widget::button::standard(fl!("time-format-24h")).on_press(Message::SetTimeFormat(false))
+        } else {
+            widget::button::suggested(fl!("time-format-24h"))
+                .on_press(Message::SetTimeFormat(false))
+        };
+        let btn_12h = if self.use_12h {
+            widget::button::suggested(fl!("time-format-12h")).on_press(Message::SetTimeFormat(true))
+        } else {
+            widget::button::standard(fl!("time-format-12h")).on_press(Message::SetTimeFormat(true))
+        };
+
+        let row = widget::row::with_capacity(2)
+            .spacing(8)
+            .push(btn_24h)
+            .push(btn_12h);
+        col = col.push(row);
+
+        col.into()
     }
 
     fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
@@ -572,9 +623,7 @@ fn open_sound_file_dialog(target: CustomSoundTarget) -> Task<cosmic::Action<Mess
                 let path = response.url().path().to_string();
                 cosmic::Action::App(Message::CustomSoundSelected(target, path))
             }
-            Err(_) => {
-                cosmic::Action::App(Message::Tick)
-            }
+            Err(_) => cosmic::Action::App(Message::Tick),
         }
     })
 }
@@ -586,6 +635,7 @@ fn build_config_from_state(
     al: &alarm::AlarmState,
     ti: &timer::TimerState,
     po: &pomodoro::PomodoroState,
+    use_12h: bool,
 ) -> Config {
     let world_clocks = wc
         .clocks
@@ -604,9 +654,9 @@ fn build_config_from_state(
             let repeat_mode = match &a.repeat_mode {
                 alarm::RepeatMode::Once => SavedRepeatMode::Once,
                 alarm::RepeatMode::EveryDay => SavedRepeatMode::EveryDay,
-                alarm::RepeatMode::Custom(days) => {
-                    SavedRepeatMode::Custom(days.iter().map(|d| d.short_name().to_string()).collect())
-                }
+                alarm::RepeatMode::Custom(days) => SavedRepeatMode::Custom(
+                    days.iter().map(|d| d.short_name().to_string()).collect(),
+                ),
             };
             SavedAlarm {
                 hour: a.hour,
@@ -657,6 +707,7 @@ fn build_config_from_state(
         timers,
         pomodoros,
         pomodoro_defaults,
+        use_12h,
     }
 }
 
@@ -820,8 +871,13 @@ fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     if !config.pomodoros.is_empty() {
         state.timers.clear();
         for (i, p) in config.pomodoros.iter().enumerate() {
-            let mut timer =
-                pomodoro::PomodoroTimer::from_config(i as u32, p.label.clone(), p.work_minutes, p.short_break_minutes, p.long_break_minutes);
+            let mut timer = pomodoro::PomodoroTimer::from_config(
+                i as u32,
+                p.label.clone(),
+                p.work_minutes,
+                p.short_break_minutes,
+                p.long_break_minutes,
+            );
             // Migrate "Default" sound to "Bell"
             timer.sound = if p.sound == "Default" {
                 "Bell".to_string()

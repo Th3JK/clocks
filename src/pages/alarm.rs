@@ -153,6 +153,7 @@ pub struct AlarmEdit {
     pub id: Option<u32>,
     pub hour: u8,
     pub minute: u8,
+    pub is_pm: bool,
     pub label: String,
     pub repeat_mode: RepeatMode,
     pub sound: String,
@@ -193,12 +194,13 @@ pub enum Message {
     EditSnoozeMinutes(u8),
     EditRingMinutes(u8),
     BrowseCustomSound,
+    ToggleAmPm(bool),
     SnoozeAlarm(u32),
     DismissAlarm(u32),
 }
 
 impl AlarmState {
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message, use_12h: bool) {
         match message {
             Message::ToggleAlarm(id) => {
                 if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
@@ -209,10 +211,16 @@ impl AlarmState {
                 self.alarms.retain(|a| a.id != id);
             }
             Message::StartNewAlarm => {
+                let (hour, is_pm) = if use_12h {
+                    (8, false) // 8 AM
+                } else {
+                    (8, false)
+                };
                 self.editing = Some(AlarmEdit {
                     id: None,
-                    hour: 8,
+                    hour,
                     minute: 0,
+                    is_pm,
                     label: String::new(),
                     repeat_mode: RepeatMode::Once,
                     sound: "Bell".to_string(),
@@ -222,10 +230,16 @@ impl AlarmState {
             }
             Message::StartEditAlarm(id) => {
                 if let Some(alarm) = self.alarms.iter().find(|a| a.id == id) {
+                    let (hour, is_pm) = if use_12h {
+                        hour24_to_12(alarm.hour)
+                    } else {
+                        (alarm.hour, false)
+                    };
                     self.editing = Some(AlarmEdit {
                         id: Some(alarm.id),
-                        hour: alarm.hour,
+                        hour,
                         minute: alarm.minute,
+                        is_pm,
                         label: alarm.label.clone(),
                         repeat_mode: alarm.repeat_mode.clone(),
                         sound: alarm.sound.clone(),
@@ -239,9 +253,14 @@ impl AlarmState {
             }
             Message::SaveAlarm => {
                 if let Some(edit) = self.editing.take() {
+                    let saved_hour = if use_12h {
+                        hour12_to_24(edit.hour, edit.is_pm)
+                    } else {
+                        edit.hour
+                    };
                     if let Some(id) = edit.id {
                         if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
-                            alarm.hour = edit.hour;
+                            alarm.hour = saved_hour;
                             alarm.minute = edit.minute;
                             alarm.label = edit.label;
                             alarm.repeat_mode = edit.repeat_mode;
@@ -252,7 +271,7 @@ impl AlarmState {
                     } else {
                         self.alarms.push(AlarmEntry {
                             id: self.next_id,
-                            hour: edit.hour,
+                            hour: saved_hour,
                             minute: edit.minute,
                             label: if edit.label.is_empty() {
                                 fl!("alarm-default-label")
@@ -271,12 +290,20 @@ impl AlarmState {
             }
             Message::IncrementHour => {
                 if let Some(edit) = &mut self.editing {
-                    edit.hour = (edit.hour + 1) % 24;
+                    if use_12h {
+                        edit.hour = if edit.hour == 12 { 1 } else { edit.hour + 1 };
+                    } else {
+                        edit.hour = (edit.hour + 1) % 24;
+                    }
                 }
             }
             Message::DecrementHour => {
                 if let Some(edit) = &mut self.editing {
-                    edit.hour = if edit.hour == 0 { 23 } else { edit.hour - 1 };
+                    if use_12h {
+                        edit.hour = if edit.hour == 1 { 12 } else { edit.hour - 1 };
+                    } else {
+                        edit.hour = if edit.hour == 0 { 23 } else { edit.hour - 1 };
+                    }
                 }
             }
             Message::IncrementMinute => {
@@ -321,6 +348,11 @@ impl AlarmState {
             Message::EditRingMinutes(m) => {
                 if let Some(edit) = &mut self.editing {
                     edit.ring_minutes = m.max(1).min(30);
+                }
+            }
+            Message::ToggleAmPm(is_pm) => {
+                if let Some(edit) = &mut self.editing {
+                    edit.is_pm = is_pm;
                 }
             }
             Message::BrowseCustomSound => {
@@ -461,7 +493,7 @@ impl AlarmState {
     }
 
     /// Main view: page header + alarm list
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = 12;
         let mut col = widget::column::with_capacity(self.alarms.len() + 3)
             .spacing(spacing);
@@ -488,7 +520,13 @@ impl AlarmState {
         }
 
         for alarm in &self.alarms {
-            let time_str = format!("{:02}:{:02}", alarm.hour, alarm.minute);
+            let time_str = if use_12h {
+                let (h12, is_pm) = hour24_to_12(alarm.hour);
+                let period = if is_pm { fl!("pm") } else { fl!("am") };
+                format!("{:02}:{:02} {}", h12, alarm.minute, period)
+            } else {
+                format!("{:02}:{:02}", alarm.hour, alarm.minute)
+            };
 
             let id = alarm.id;
             let row = widget::row::with_capacity(5)
@@ -524,7 +562,7 @@ impl AlarmState {
     }
 
     /// Sidebar view: alarm editing form
-    pub fn sidebar_view(&self) -> Element<'_, Message> {
+    pub fn sidebar_view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = 12;
         let mut col = widget::column::with_capacity(10).spacing(spacing);
 
@@ -562,6 +600,25 @@ impl AlarmState {
                         .on_press(Message::IncrementMinute),
                 );
             col = col.push(time_row);
+
+            // AM/PM selector (only in 12h mode)
+            if use_12h {
+                let am_btn = if edit.is_pm {
+                    widget::button::standard(fl!("am")).on_press(Message::ToggleAmPm(false))
+                } else {
+                    widget::button::suggested(fl!("am")).on_press(Message::ToggleAmPm(false))
+                };
+                let pm_btn = if edit.is_pm {
+                    widget::button::suggested(fl!("pm")).on_press(Message::ToggleAmPm(true))
+                } else {
+                    widget::button::standard(fl!("pm")).on_press(Message::ToggleAmPm(true))
+                };
+                let ampm_row = widget::row::with_capacity(2)
+                    .spacing(8)
+                    .push(am_btn)
+                    .push(pm_btn);
+                col = col.push(ampm_row);
+            }
 
             // Repeat mode with highlighted selection
             col = col.push(widget::text::body(fl!("repeat")));
@@ -663,5 +720,26 @@ impl AlarmState {
         }
 
         col.into()
+    }
+}
+
+/// Convert 24h hour (0-23) to 12h display hour (1-12) + `is_pm`
+fn hour24_to_12(hour24: u8) -> (u8, bool) {
+    let is_pm = hour24 >= 12;
+    let h12 = match hour24 {
+        0 => 12,
+        1..=12 => hour24,
+        _ => hour24 - 12,
+    };
+    (h12, is_pm)
+}
+
+/// Convert 12h display hour (1-12) + `is_pm` to 24h hour (0-23)
+fn hour12_to_24(hour12: u8, is_pm: bool) -> u8 {
+    match (hour12, is_pm) {
+        (12, false) => 0,   // 12 AM = 0
+        (12, true) => 12,   // 12 PM = 12
+        (h, false) => h,    // 1-11 AM = 1-11
+        (h, true) => h + 12, // 1-11 PM = 13-23
     }
 }
