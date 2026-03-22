@@ -144,3 +144,20 @@ long-break-label = Dlouhá pauza:
 pomodoro-default-label = Pomodoro { $id }
 pomodoro-transition = { $label }: { $prev } dokončena! Začíná { $next }
 pomodoro-settings = Nastavení Pomodoro
+
+# Shortcuts
+shortcuts = Klávesové zkratky
+shortcuts-description = Klávesové zkratky dostupné v této aplikaci
+shortcuts-close = Zavřít
+shortcuts-global = Globální
+shortcuts-page = Stránka
+shortcuts-quit = Ukončit
+shortcuts-next-tab = Další karta
+shortcuts-prev-tab = Předchozí karta
+shortcuts-tabs = Karty
+shortcuts-show-shortcuts = Zobrazit zkratky
+shortcuts-start-pause = Spustit / Pozastavit
+shortcuts-lap = Kolo (Stopky)
+shortcuts-reset = Resetovat
+shortcuts-new-item = Nová položka
+shortcuts-skip-break = Přeskočit pauzu (Pomodoro)

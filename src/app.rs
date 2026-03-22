@@ -9,8 +9,10 @@ use crate::pages::{ContextPage, Page, alarm, pomodoro, stopwatch, timer, world_c
 use chrono::{Datelike, Local, Timelike};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
+use cosmic::iced::keyboard::{self, key::Named, Key};
 use cosmic::iced::Length;
 use cosmic::iced::Subscription;
+use cosmic::iced_futures::event::listen_raw;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::{iced_futures, prelude::*};
 use std::collections::HashMap;
@@ -32,6 +34,7 @@ pub struct AppModel {
     config: Config,
     config_context: Option<cosmic_config::Config>,
     use_12h: bool,
+    show_shortcuts_dialog: bool,
 
     // Page states (each page owns its own MVU model)
     world_clocks: world_clocks::WorldClocksState,
@@ -39,6 +42,10 @@ pub struct AppModel {
     alarm: alarm::AlarmState,
     timer: timer::TimerState,
     pomodoro: pomodoro::PomodoroState,
+
+    // Last-active item IDs for keyboard shortcut targeting (session-only, not persisted)
+    active_timer_id: Option<u32>,
+    active_pomodoro_id: Option<u32>,
 
     // Audio stop handles for ringing alarms
     alarm_audio_stops: HashMap<u32, Arc<AtomicBool>>,
@@ -59,6 +66,18 @@ pub enum Message {
     Pomodoro(pomodoro::Message),
     CustomSoundSelected(CustomSoundTarget, String),
     SetTimeFormat(bool),
+    // Keyboard shortcuts
+    Quit,
+    NavigateNext,
+    NavigatePrev,
+    NavigateTo(u16),
+    PageShortcutSpace,
+    PageShortcutEnter,
+    PageShortcutDelete,
+    PageShortcutCtrlN,
+    PageShortcutSkip,
+    ShowShortcutsDialog,
+    CloseShortcutsDialog,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,6 +91,7 @@ pub enum CustomSoundTarget {
 pub enum MenuAction {
     About,
     Settings,
+    Shortcuts,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -81,6 +101,7 @@ impl menu::action::MenuAction for MenuAction {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
             MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
+            MenuAction::Shortcuts => Message::ShowShortcutsDialog,
         }
     }
 }
@@ -167,11 +188,14 @@ impl cosmic::Application for AppModel {
             config,
             config_context,
             use_12h,
+            show_shortcuts_dialog: false,
             world_clocks,
             stopwatch: stopwatch::StopwatchState::default(),
             alarm,
             timer,
             pomodoro,
+            active_timer_id: None,
+            active_pomodoro_id: None,
             alarm_audio_stops: HashMap::new(),
         };
 
@@ -183,11 +207,15 @@ impl cosmic::Application for AppModel {
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            menu::root(fl!("view")).apply(Element::from),
+            widget::button::custom(widget::text(fl!("view")))
+                .padding([4, 12])
+                .class(cosmic::theme::Button::MenuRoot)
+                .apply(Element::from),
             menu::items(
                 &self.key_binds,
                 vec![
                     menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
+                    menu::Item::Button(fl!("shortcuts"), None, MenuAction::Shortcuts),
                     menu::Item::Button(fl!("about"), None, MenuAction::About),
                 ],
             ),
@@ -279,21 +307,29 @@ impl cosmic::Application for AppModel {
     }
 
     fn dialog(&self) -> Option<Element<'_, Self::Message>> {
-        let ringing = self.alarm.ringing.first()?;
-        let aid = ringing.alarm_id;
-        let dialog = widget::dialog()
-            .title(fl!("alarm-ringing", label = ringing.label.clone()))
-            .body(fl!("ringing"))
-            .icon(widget::icon::from_name("alarm-symbolic").size(64))
-            .primary_action(
-                widget::button::destructive(fl!("dismiss"))
-                    .on_press(Message::Alarm(alarm::Message::DismissAlarm(aid))),
-            )
-            .secondary_action(
-                widget::button::standard(fl!("snooze"))
-                    .on_press(Message::Alarm(alarm::Message::SnoozeAlarm(aid))),
-            );
-        Some(dialog.into())
+        // Alarm dialog takes priority over shortcuts dialog
+        if let Some(ringing) = self.alarm.ringing.first() {
+            let aid = ringing.alarm_id;
+            let dialog = widget::dialog()
+                .title(fl!("alarm-ringing", label = ringing.label.clone()))
+                .body(fl!("ringing"))
+                .icon(widget::icon::from_name("alarm-symbolic").size(64))
+                .primary_action(
+                    widget::button::destructive(fl!("dismiss"))
+                        .on_press(Message::Alarm(alarm::Message::DismissAlarm(aid))),
+                )
+                .secondary_action(
+                    widget::button::standard(fl!("snooze"))
+                        .on_press(Message::Alarm(alarm::Message::SnoozeAlarm(aid))),
+                );
+            return Some(dialog.into());
+        }
+
+        if self.show_shortcuts_dialog {
+            return Some(self.shortcuts_dialog_view());
+        }
+
+        None
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -304,6 +340,7 @@ impl cosmic::Application for AppModel {
         ];
 
         subscriptions.push(Subscription::run(tick_subscription));
+        subscriptions.push(listen_raw(input_subscription));
 
         Subscription::batch(subscriptions)
     }
@@ -311,7 +348,13 @@ impl cosmic::Application for AppModel {
     // --- Update ---
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
-        let should_save = !matches!(message, Message::Tick | Message::UpdateConfig(_));
+        let should_save = !matches!(
+            message,
+            Message::Tick
+                | Message::UpdateConfig(_)
+                | Message::CloseShortcutsDialog
+                | Message::ShowShortcutsDialog
+        );
 
         match message {
             Message::Tick => {
@@ -364,6 +407,9 @@ impl cosmic::Application for AppModel {
 
             Message::Timer(ref msg) => match msg {
                 timer::Message::StartNew | timer::Message::StartEditTimer(_) => {
+                    if let timer::Message::StartEditTimer(id) = msg {
+                        self.active_timer_id = Some(*id);
+                    }
                     self.timer.update(msg.clone());
                     self.context_page = ContextPage::TimerAdd;
                     self.core.window.show_context = true;
@@ -371,8 +417,20 @@ impl cosmic::Application for AppModel {
                     return widget::text_input::focus(widget::Id::new("timer-label-input"));
                 }
                 timer::Message::CancelEdit | timer::Message::SaveTimer => {
+                    if matches!(msg, timer::Message::SaveTimer) {
+                        // Track the newly saved timer as active
+                        if let Some(t) = self.timer.timers.last() {
+                            self.active_timer_id = Some(t.id);
+                        }
+                    }
                     self.timer.update(msg.clone());
                     self.core.window.show_context = false;
+                }
+                timer::Message::StartTimer(id)
+                | timer::Message::PauseTimer(id)
+                | timer::Message::ResumeTimer(id) => {
+                    self.active_timer_id = Some(*id);
+                    self.timer.update(msg.clone());
                 }
                 timer::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Timer);
@@ -397,6 +455,9 @@ impl cosmic::Application for AppModel {
 
             Message::Pomodoro(ref msg) => match msg {
                 pomodoro::Message::OpenSettings | pomodoro::Message::StartEditPomodoro(_) => {
+                    if let pomodoro::Message::StartEditPomodoro(id) = msg {
+                        self.active_pomodoro_id = Some(*id);
+                    }
                     self.pomodoro.update(msg.clone());
                     self.context_page = ContextPage::PomodoroSettings;
                     self.core.window.show_context = true;
@@ -404,8 +465,20 @@ impl cosmic::Application for AppModel {
                     return widget::text_input::focus(widget::Id::new("pomodoro-label-input"));
                 }
                 pomodoro::Message::CancelEditPomodoro | pomodoro::Message::SaveEditPomodoro => {
+                    if matches!(msg, pomodoro::Message::SaveEditPomodoro)
+                        && let Some(p) = self.pomodoro.timers.last()
+                    {
+                        self.active_pomodoro_id = Some(p.id);
+                    }
                     self.pomodoro.update(msg.clone());
                     self.core.window.show_context = false;
+                }
+                pomodoro::Message::Start(id)
+                | pomodoro::Message::Pause(id)
+                | pomodoro::Message::Resume(id)
+                | pomodoro::Message::Skip(id) => {
+                    self.active_pomodoro_id = Some(*id);
+                    self.pomodoro.update(msg.clone());
                 }
                 pomodoro::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Pomodoro);
@@ -447,6 +520,66 @@ impl cosmic::Application for AppModel {
 
             Message::SetTimeFormat(use_12h) => {
                 self.use_12h = use_12h;
+            }
+
+            Message::Quit => {
+                std::process::exit(0);
+            }
+
+            Message::NavigateNext => {
+                let pos = self.nav.position(self.nav.active()).unwrap_or(0);
+                let count = self.nav.iter().count() as u16;
+                let next = (pos + 1) % count;
+                if self.nav.activate_position(next) {
+                    self.core.window.show_context = false;
+                    return self.update_title();
+                }
+            }
+
+            Message::NavigatePrev => {
+                let pos = self.nav.position(self.nav.active()).unwrap_or(0);
+                let count = self.nav.iter().count() as u16;
+                let prev = if pos == 0 { count - 1 } else { pos - 1 };
+                if self.nav.activate_position(prev) {
+                    self.core.window.show_context = false;
+                    return self.update_title();
+                }
+            }
+
+            Message::NavigateTo(pos) => {
+                if self.nav.activate_position(pos) {
+                    self.core.window.show_context = false;
+                    return self.update_title();
+                }
+            }
+
+            Message::PageShortcutSpace => {
+                return self.handle_page_shortcut_space();
+            }
+
+            Message::PageShortcutEnter => {
+                return self.handle_page_shortcut_enter();
+            }
+
+            Message::PageShortcutDelete => {
+                return self.handle_page_shortcut_delete();
+            }
+
+            Message::PageShortcutCtrlN => {
+                return self.handle_page_shortcut_ctrl_n();
+            }
+
+            Message::PageShortcutSkip => {
+                return self.handle_page_shortcut_skip();
+            }
+
+            Message::ShowShortcutsDialog => {
+                self.show_shortcuts_dialog = true;
+                self.core.window.show_context = false;
+            }
+
+            Message::CloseShortcutsDialog => {
+                self.show_shortcuts_dialog = false;
             }
 
             Message::LaunchUrl(url) => match open::that_detached(&url) {
@@ -594,6 +727,265 @@ impl AppModel {
         col.into()
     }
 
+    fn active_timer(&self) -> Option<&timer::TimerEntry> {
+        self.active_timer_id
+            .and_then(|id| self.timer.timers.iter().find(|t| t.id == id))
+            .or_else(|| self.timer.timers.first())
+    }
+
+    fn active_pomodoro(&self) -> Option<&pomodoro::PomodoroTimer> {
+        self.active_pomodoro_id
+            .and_then(|id| self.pomodoro.timers.iter().find(|p| p.id == id))
+            .or_else(|| self.pomodoro.timers.first())
+    }
+
+    fn handle_page_shortcut_space(&mut self) -> Task<cosmic::Action<Message>> {
+        match self.nav.active_data::<Page>() {
+            Some(Page::Stopwatch) => {
+                if self.stopwatch.is_running {
+                    self.stopwatch.update(stopwatch::Message::Stop);
+                } else {
+                    self.stopwatch.update(stopwatch::Message::Start);
+                }
+                self.save_state();
+            }
+            Some(Page::Timer) => {
+                if let Some(t) = self.active_timer() {
+                    let id = t.id;
+                    let msg = if t.is_running {
+                        timer::Message::PauseTimer(id)
+                    } else if t.remaining < t.initial_duration {
+                        timer::Message::ResumeTimer(id)
+                    } else {
+                        timer::Message::StartTimer(id)
+                    };
+                    self.active_timer_id = Some(id);
+                    self.timer.update(msg);
+                    self.save_state();
+                }
+            }
+            Some(Page::Pomodoro) => {
+                if let Some(p) = self.active_pomodoro() {
+                    let id = p.id;
+                    let msg = if p.is_running {
+                        pomodoro::Message::Pause(id)
+                    } else if p.remaining < p.started_remaining {
+                        pomodoro::Message::Resume(id)
+                    } else {
+                        pomodoro::Message::Start(id)
+                    };
+                    self.active_pomodoro_id = Some(id);
+                    self.pomodoro.update(msg);
+                    self.save_state();
+                }
+            }
+            _ => {}
+        }
+        Task::none()
+    }
+
+    fn handle_page_shortcut_enter(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(Page::Stopwatch) = self.nav.active_data::<Page>()
+            && self.stopwatch.is_running
+        {
+            self.stopwatch.update(stopwatch::Message::Lap);
+            self.save_state();
+        }
+        Task::none()
+    }
+
+    fn handle_page_shortcut_delete(&mut self) -> Task<cosmic::Action<Message>> {
+        match self.nav.active_data::<Page>() {
+            Some(Page::Stopwatch) => {
+                if !self.stopwatch.is_running
+                    && self.stopwatch.elapsed > std::time::Duration::ZERO
+                {
+                    self.stopwatch.update(stopwatch::Message::Reset);
+                    self.save_state();
+                }
+            }
+            Some(Page::Timer) => {
+                if let Some(t) = self.active_timer() {
+                    let id = t.id;
+                    if !t.is_running && t.remaining < t.initial_duration {
+                        self.timer.update(timer::Message::ResetTimer(id));
+                        self.save_state();
+                    }
+                }
+            }
+            Some(Page::Pomodoro) => {
+                if let Some(p) = self.active_pomodoro() {
+                    let id = p.id;
+                    if !p.is_running {
+                        self.pomodoro.update(pomodoro::Message::Reset(id));
+                        self.save_state();
+                    }
+                }
+            }
+            _ => {}
+        }
+        Task::none()
+    }
+
+    fn handle_page_shortcut_ctrl_n(&mut self) -> Task<cosmic::Action<Message>> {
+        match self.nav.active_data::<Page>() {
+            Some(Page::WorldClocks) => {
+                self.context_page = ContextPage::WorldClocksAdd;
+                self.core.window.show_context = true;
+                self.save_state();
+                return widget::text_input::focus(widget::Id::new(
+                    "world-clocks-search-input",
+                ));
+            }
+            Some(Page::Alarm) => {
+                self.alarm.update(alarm::Message::StartNewAlarm, self.use_12h);
+                self.context_page = ContextPage::AlarmEdit;
+                self.core.window.show_context = true;
+                self.save_state();
+                return widget::text_input::focus(widget::Id::new("alarm-label-input"));
+            }
+            Some(Page::Timer) => {
+                self.timer.update(timer::Message::StartNew);
+                self.context_page = ContextPage::TimerAdd;
+                self.core.window.show_context = true;
+                self.save_state();
+                return widget::text_input::focus(widget::Id::new("timer-label-input"));
+            }
+            Some(Page::Pomodoro) => {
+                self.pomodoro.update(pomodoro::Message::AddTimer);
+                self.save_state();
+            }
+            _ => {}
+        }
+        Task::none()
+    }
+
+    fn handle_page_shortcut_skip(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(Page::Pomodoro) = self.nav.active_data::<Page>()
+            && let Some(p) = self.active_pomodoro()
+        {
+            let id = p.id;
+            if p.is_running
+                && matches!(
+                    p.session_type,
+                    pomodoro::SessionType::ShortBreak | pomodoro::SessionType::LongBreak
+                )
+            {
+                self.active_pomodoro_id = Some(id);
+                self.pomodoro.update(pomodoro::Message::Skip(id));
+                self.save_state();
+            }
+        }
+        Task::none()
+    }
+
+    fn shortcuts_dialog_view(&self) -> Element<'_, Message> {
+        let spacing = 10;
+        let mut col = widget::column::with_capacity(26).spacing(spacing);
+
+        // Global shortcuts
+        col = col.push(widget::text::title4(fl!("shortcuts-global")));
+        col = col.push(Self::shortcut_row(fl!("shortcuts-quit"), &["Ctrl", "Q"]));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-next-tab"),
+            &["Ctrl", "↓"],
+        ));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-prev-tab"),
+            &["Ctrl", "↑"],
+        ));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-show-shortcuts"),
+            &["Ctrl", "?"],
+        ));
+
+        col = col.push(widget::divider::horizontal::default());
+
+        // Tab shortcuts
+        col = col.push(widget::text::title4(fl!("shortcuts-tabs")));
+        col = col.push(Self::shortcut_row(fl!("nav-world-clocks"), &["Alt", "1"]));
+        col = col.push(Self::shortcut_row(fl!("nav-stopwatch"), &["Alt", "2"]));
+        col = col.push(Self::shortcut_row(fl!("nav-alarm"), &["Alt", "3"]));
+        col = col.push(Self::shortcut_row(fl!("nav-timer"), &["Alt", "4"]));
+        col = col.push(Self::shortcut_row(fl!("nav-pomodoro"), &["Alt", "5"]));
+
+        col = col.push(widget::divider::horizontal::default());
+
+        // Page shortcuts
+        col = col.push(widget::text::title4(fl!("shortcuts-page")));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-start-pause"),
+            &["Space"],
+        ));
+        col = col.push(Self::shortcut_row(fl!("shortcuts-lap"), &["Enter"]));
+        col = col.push(Self::shortcut_row(fl!("shortcuts-reset"), &["Delete"]));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-new-item"),
+            &["Ctrl", "N"],
+        ));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-skip-break"),
+            &["Ctrl", "S"],
+        ));
+
+        let dialog = widget::dialog()
+            .title(fl!("shortcuts"))
+            .body(fl!("shortcuts-description"))
+            .control(col)
+            .primary_action(
+                widget::button::standard(fl!("shortcuts-close"))
+                    .on_press(Message::CloseShortcutsDialog),
+            );
+
+        dialog.into()
+    }
+
+    fn shortcut_row<'a>(action: String, keys: &'a [&'a str]) -> Element<'a, Message> {
+        use cosmic::iced::widget::container as iced_container;
+        use cosmic::iced_core::{Background, Border};
+
+        let keys_row = keys.iter().fold(
+            widget::row::with_capacity(keys.len() * 2)
+                .spacing(4)
+                .align_y(cosmic::iced::Alignment::Center),
+            |row, key| {
+                row.push(
+                    widget::container(
+                        widget::text::body(key.to_string())
+                            .size(13.0)
+                            .align_x(cosmic::iced::Alignment::Center),
+                    )
+                    .padding([2, 8])
+                    .style(|theme: &cosmic::Theme| {
+                        let cosmic = theme.cosmic();
+                        iced_container::Style {
+                            background: Some(Background::Color(
+                                cosmic.background.component.hover.into(),
+                            )),
+                            border: Border {
+                                color: cosmic.background.component.divider.into(),
+                                width: 1.0,
+                                radius: cosmic.corner_radii.radius_xs.into(),
+                            },
+                            ..Default::default()
+                        }
+                    }),
+                )
+            },
+        );
+
+        widget::row::with_capacity(2)
+            .push(widget::text::body(action).width(Length::FillPortion(3)))
+            .push(
+                widget::container(keys_row)
+                    .width(Length::FillPortion(2))
+                    .align_x(cosmic::iced::Alignment::End),
+            )
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .into()
+    }
+
     fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
         let mut window_title = fl!("app-title");
 
@@ -621,6 +1013,83 @@ fn tick_subscription() -> impl futures_util::Stream<Item = Message> {
             _ = emitter.send(Message::Tick).await;
         }
     })
+}
+
+fn input_subscription(
+    event: cosmic::iced::Event,
+    status: cosmic::iced::event::Status,
+    _window: cosmic::iced::window::Id,
+) -> Option<Message> {
+    // Only handle ignored events (not consumed by widgets like text inputs)
+    if status != cosmic::iced::event::Status::Ignored {
+        return None;
+    }
+
+    let cosmic::iced::Event::Keyboard(keyboard::Event::KeyPressed {
+        key, modifiers, ..
+    }) = event
+    else {
+        return None;
+    };
+
+    let ctrl = modifiers.control();
+    let alt = modifiers.alt();
+
+    // For non-alphabetic character keys, Shift is inherent to producing the
+    // character (e.g. Shift+/ → ?), so strip it to avoid mismatches when a
+    // binding is defined for the shifted character without an explicit Shift
+    // modifier.
+    let shift = match key.as_ref() {
+        Key::Character(c) if c.chars().all(|ch| !ch.is_ascii_alphabetic()) => false,
+        _ => modifiers.shift(),
+    };
+
+    match key.as_ref() {
+        // Ctrl+Q → Quit
+        Key::Character("q") if ctrl && !alt && !shift => Some(Message::Quit),
+
+        // Ctrl+PageDown → Next tab
+        Key::Named(Named::PageDown) if ctrl && !alt && !shift => Some(Message::NavigateNext),
+
+        // Ctrl+PageUp → Previous tab
+        Key::Named(Named::PageUp) if ctrl && !alt && !shift => Some(Message::NavigatePrev),
+
+        // Alt+1..5 → Direct tab navigation
+        Key::Character("1") if alt && !ctrl && !shift => Some(Message::NavigateTo(0)),
+        Key::Character("2") if alt && !ctrl && !shift => Some(Message::NavigateTo(1)),
+        Key::Character("3") if alt && !ctrl && !shift => Some(Message::NavigateTo(2)),
+        Key::Character("4") if alt && !ctrl && !shift => Some(Message::NavigateTo(3)),
+        Key::Character("5") if alt && !ctrl && !shift => Some(Message::NavigateTo(4)),
+
+        // Ctrl+N → New item (page-scoped)
+        Key::Character("n") if ctrl && !alt && !shift => Some(Message::PageShortcutCtrlN),
+
+        // Ctrl+? (Ctrl+Shift+/) → Show shortcuts dialog
+        Key::Character("?") if ctrl && !alt => Some(Message::ShowShortcutsDialog),
+        // Fallback: some platforms report the physical key "/" instead of "?"
+        Key::Character("/") if ctrl && !alt && modifiers.shift() => {
+            Some(Message::ShowShortcutsDialog)
+        }
+
+        // Ctrl+S → Skip break (Pomodoro)
+        Key::Character("s") if ctrl && !alt && !shift => Some(Message::PageShortcutSkip),
+
+        // Space → Start/Pause (page-scoped)
+        Key::Character(" ") if !ctrl && !alt && !shift => Some(Message::PageShortcutSpace),
+
+        // Enter → Lap (page-scoped)
+        Key::Named(Named::Enter) if !ctrl && !alt && !shift => Some(Message::PageShortcutEnter),
+
+        // Delete / Backspace → Reset (page-scoped)
+        Key::Named(Named::Delete | Named::Backspace) if !ctrl && !alt && !shift => {
+            Some(Message::PageShortcutDelete)
+        }
+
+        // Escape → Close shortcuts dialog
+        Key::Named(Named::Escape) => Some(Message::CloseShortcutsDialog),
+
+        _ => None,
+    }
 }
 
 fn open_sound_file_dialog(target: CustomSoundTarget) -> Task<cosmic::Action<Message>> {
@@ -871,12 +1340,12 @@ fn restore_timers(config: &Config) -> timer::TimerState {
 }
 
 fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
-    let mut state = pomodoro::PomodoroState::default();
-
-    // Apply saved defaults
-    state.default_work_minutes = config.pomodoro_defaults.work_minutes;
-    state.default_short_break_minutes = config.pomodoro_defaults.short_break_minutes;
-    state.default_long_break_minutes = config.pomodoro_defaults.long_break_minutes;
+    let mut state = pomodoro::PomodoroState {
+        default_work_minutes: config.pomodoro_defaults.work_minutes,
+        default_short_break_minutes: config.pomodoro_defaults.short_break_minutes,
+        default_long_break_minutes: config.pomodoro_defaults.long_break_minutes,
+        ..Default::default()
+    };
 
     if !config.pomodoros.is_empty() {
         state.timers.clear();

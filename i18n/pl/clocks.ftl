@@ -144,3 +144,20 @@ long-break-label = Długa przerwa:
 pomodoro-default-label = Pomodoro { $id }
 pomodoro-transition = { $label }: { $prev } zakończone! Rozpoczynanie { $next }
 pomodoro-settings = Ustawienia Pomodoro
+
+# Shortcuts
+shortcuts = Skróty klawiszowe
+shortcuts-description = Skróty klawiszowe dostępne w tej aplikacji
+shortcuts-close = Zamknij
+shortcuts-global = Globalne
+shortcuts-page = Strona
+shortcuts-quit = Zakończ
+shortcuts-next-tab = Następna karta
+shortcuts-prev-tab = Poprzednia karta
+shortcuts-tabs = Karty
+shortcuts-show-shortcuts = Pokaż skróty
+shortcuts-start-pause = Start / Pauza
+shortcuts-lap = Okrążenie (Stoper)
+shortcuts-reset = Resetuj
+shortcuts-new-item = Nowy element
+shortcuts-skip-break = Pomiń przerwę (Pomodoro)

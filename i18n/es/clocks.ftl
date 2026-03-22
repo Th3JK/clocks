@@ -144,3 +144,20 @@ long-break-label = Descanso largo:
 pomodoro-default-label = Pomodoro { $id }
 pomodoro-transition = { $label }: { $prev } ¡completado! Iniciando { $next }
 pomodoro-settings = Configuración Pomodoro
+
+# Shortcuts
+shortcuts = Atajos de teclado
+shortcuts-description = Atajos de teclado disponibles en esta aplicación
+shortcuts-close = Cerrar
+shortcuts-global = Global
+shortcuts-page = Página
+shortcuts-quit = Salir
+shortcuts-next-tab = Siguiente pestaña
+shortcuts-prev-tab = Pestaña anterior
+shortcuts-tabs = Pestañas
+shortcuts-show-shortcuts = Mostrar atajos
+shortcuts-start-pause = Iniciar / Pausar
+shortcuts-lap = Vuelta (Cronómetro)
+shortcuts-reset = Reiniciar
+shortcuts-new-item = Nuevo elemento
+shortcuts-skip-break = Saltar descanso (Pomodoro)

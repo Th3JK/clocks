@@ -102,11 +102,11 @@ impl StopwatchState {
                 self.is_running = false;
                 self.elapsed = self.accumulated;
                 // Update current session
-                if let Some(session_id) = self.current_session_id {
-                    if let Some(record) = self.history.iter_mut().find(|r| r.id == session_id) {
-                        record.total_elapsed = self.elapsed;
-                        record.laps = self.laps.clone();
-                    }
+                if let Some(session_id) = self.current_session_id
+                    && let Some(record) = self.history.iter_mut().find(|r| r.id == session_id)
+                {
+                    record.total_elapsed = self.elapsed;
+                    record.laps = self.laps.clone();
                 }
             }
             Message::Reset => {
@@ -158,11 +158,11 @@ impl StopwatchState {
                     }
                 }
                 // Update current session history entry
-                if let Some(session_id) = self.current_session_id {
-                    if let Some(record) = self.history.iter_mut().find(|r| r.id == session_id) {
-                        record.total_elapsed = current_elapsed;
-                        record.laps = self.laps.clone();
-                    }
+                if let Some(session_id) = self.current_session_id
+                    && let Some(record) = self.history.iter_mut().find(|r| r.id == session_id)
+                {
+                    record.total_elapsed = current_elapsed;
+                    record.laps = self.laps.clone();
                 }
             }
             Message::Tick => {

@@ -144,3 +144,20 @@ long-break-label = Длинный перерыв:
 pomodoro-default-label = Помодоро { $id }
 pomodoro-transition = { $label }: { $prev } завершена! Начинается { $next }
 pomodoro-settings = Настройки Помодоро
+
+# Shortcuts
+shortcuts = Горячие клавиши
+shortcuts-description = Горячие клавиши, доступные в этом приложении
+shortcuts-close = Закрыть
+shortcuts-global = Глобальные
+shortcuts-page = Страница
+shortcuts-quit = Выход
+shortcuts-next-tab = Следующая вкладка
+shortcuts-prev-tab = Предыдущая вкладка
+shortcuts-tabs = Вкладки
+shortcuts-show-shortcuts = Показать горячие клавиши
+shortcuts-start-pause = Старт / Пауза
+shortcuts-lap = Круг (Секундомер)
+shortcuts-reset = Сброс
+shortcuts-new-item = Новый элемент
+shortcuts-skip-break = Пропустить перерыв (Помодоро)

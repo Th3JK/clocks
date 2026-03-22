@@ -211,11 +211,7 @@ impl AlarmState {
                 self.alarms.retain(|a| a.id != id);
             }
             Message::StartNewAlarm => {
-                let (hour, is_pm) = if use_12h {
-                    (8, false) // 8 AM
-                } else {
-                    (8, false)
-                };
+                let (hour, is_pm) = (8, false);
                 self.editing = Some(AlarmEdit {
                     id: None,
                     hour,
@@ -342,12 +338,12 @@ impl AlarmState {
             }
             Message::EditSnoozeMinutes(m) => {
                 if let Some(edit) = &mut self.editing {
-                    edit.snooze_minutes = m.max(1).min(30);
+                    edit.snooze_minutes = m.clamp(1, 30);
                 }
             }
             Message::EditRingMinutes(m) => {
                 if let Some(edit) = &mut self.editing {
-                    edit.ring_minutes = m.max(1).min(30);
+                    edit.ring_minutes = m.clamp(1, 30);
                 }
             }
             Message::ToggleAmPm(is_pm) => {

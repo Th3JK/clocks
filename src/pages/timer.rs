@@ -158,7 +158,7 @@ impl TimerState {
                             start_instant: None,
                             started_remaining: dur,
                             repeat_enabled: self.edit_repeat,
-                            repeat_count: repeat_count,
+                            repeat_count,
                             completed_count: 0,
                             sound: self.edit_sound.clone(),
                         });
@@ -229,27 +229,27 @@ impl TimerState {
             }
             Message::Tick => {
                 for timer in &mut self.timers {
-                    if timer.is_running {
-                        if let Some(start) = timer.start_instant {
-                            let elapsed = start.elapsed();
-                            timer.remaining = timer.started_remaining.saturating_sub(elapsed);
+                    if timer.is_running
+                        && let Some(start) = timer.start_instant
+                    {
+                        let elapsed = start.elapsed();
+                        timer.remaining = timer.started_remaining.saturating_sub(elapsed);
 
-                            if timer.remaining == Duration::ZERO {
-                                timer.completed_count += 1;
-                                completed_labels.push((timer.label.clone(), timer.sound.clone()));
+                        if timer.remaining == Duration::ZERO {
+                            timer.completed_count += 1;
+                            completed_labels.push((timer.label.clone(), timer.sound.clone()));
 
-                                if timer.repeat_enabled
-                                    && (timer.repeat_count == 0
-                                        || timer.completed_count < timer.repeat_count)
-                                {
-                                    // Restart
-                                    timer.remaining = timer.initial_duration;
-                                    timer.started_remaining = timer.initial_duration;
-                                    timer.start_instant = Some(Instant::now());
-                                } else {
-                                    timer.is_running = false;
-                                    timer.start_instant = None;
-                                }
+                            if timer.repeat_enabled
+                                && (timer.repeat_count == 0
+                                    || timer.completed_count < timer.repeat_count)
+                            {
+                                // Restart
+                                timer.remaining = timer.initial_duration;
+                                timer.started_remaining = timer.initial_duration;
+                                timer.start_instant = Some(Instant::now());
+                            } else {
+                                timer.is_running = false;
+                                timer.start_instant = None;
                             }
                         }
                     }

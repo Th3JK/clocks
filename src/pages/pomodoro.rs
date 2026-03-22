@@ -92,7 +92,7 @@ impl PomodoroTimer {
             SessionType::Work => {
                 self.completed_work_sessions += 1;
                 self.total_focused_secs += self.work_minutes as u64 * 60;
-                if self.completed_work_sessions % 4 == 0 {
+                if self.completed_work_sessions.is_multiple_of(4) {
                     self.session_type = SessionType::LongBreak;
                     self.remaining = self.long_break_duration();
                 } else {
@@ -266,33 +266,33 @@ impl PomodoroState {
                 // Handled in app.rs
             }
             Message::SaveEditPomodoro => {
-                if let Some(edit_id) = self.editing_id.take() {
-                    if let Some(timer) = self.timers.iter_mut().find(|t| t.id == edit_id) {
-                        if !self.edit_label.is_empty() {
-                            timer.label = self.edit_label.clone();
-                        }
-                        timer.work_minutes = self.edit_work_minutes;
-                        timer.short_break_minutes = self.edit_short_break_minutes;
-                        timer.long_break_minutes = self.edit_long_break_minutes;
-                        timer.sound = self.edit_sound.clone();
-                        // Reset duration based on current session type
-                        match timer.session_type {
-                            SessionType::Work => {
-                                timer.remaining = timer.work_duration();
-                                timer.started_remaining = timer.remaining;
-                            }
-                            SessionType::ShortBreak => {
-                                timer.remaining = timer.short_break_duration();
-                                timer.started_remaining = timer.remaining;
-                            }
-                            SessionType::LongBreak => {
-                                timer.remaining = timer.long_break_duration();
-                                timer.started_remaining = timer.remaining;
-                            }
-                        }
-                        timer.is_running = false;
-                        timer.start_instant = None;
+                if let Some(edit_id) = self.editing_id.take()
+                    && let Some(timer) = self.timers.iter_mut().find(|t| t.id == edit_id)
+                {
+                    if !self.edit_label.is_empty() {
+                        timer.label = self.edit_label.clone();
                     }
+                    timer.work_minutes = self.edit_work_minutes;
+                    timer.short_break_minutes = self.edit_short_break_minutes;
+                    timer.long_break_minutes = self.edit_long_break_minutes;
+                    timer.sound = self.edit_sound.clone();
+                    // Reset duration based on current session type
+                    match timer.session_type {
+                        SessionType::Work => {
+                            timer.remaining = timer.work_duration();
+                            timer.started_remaining = timer.remaining;
+                        }
+                        SessionType::ShortBreak => {
+                            timer.remaining = timer.short_break_duration();
+                            timer.started_remaining = timer.remaining;
+                        }
+                        SessionType::LongBreak => {
+                            timer.remaining = timer.long_break_duration();
+                            timer.started_remaining = timer.remaining;
+                        }
+                    }
+                    timer.is_running = false;
+                    timer.start_instant = None;
                 }
                 self.edit_label.clear();
             }
@@ -304,7 +304,7 @@ impl PomodoroState {
                 self.edit_label = label;
             }
             Message::SetDefaultWorkMinutes(m) => {
-                let val = m.max(1).min(120);
+                let val = m.clamp(1, 120);
                 if self.editing_id.is_some() {
                     self.edit_work_minutes = val;
                 } else {
@@ -312,7 +312,7 @@ impl PomodoroState {
                 }
             }
             Message::SetDefaultShortBreakMinutes(m) => {
-                let val = m.max(1).min(60);
+                let val = m.clamp(1, 60);
                 if self.editing_id.is_some() {
                     self.edit_short_break_minutes = val;
                 } else {
@@ -320,7 +320,7 @@ impl PomodoroState {
                 }
             }
             Message::SetDefaultLongBreakMinutes(m) => {
-                let val = m.max(1).min(60);
+                let val = m.clamp(1, 60);
                 if self.editing_id.is_some() {
                     self.edit_long_break_minutes = val;
                 } else {
@@ -329,22 +329,22 @@ impl PomodoroState {
             }
             Message::Tick => {
                 for timer in &mut self.timers {
-                    if timer.is_running {
-                        if let Some(start) = timer.start_instant {
-                            timer.remaining =
-                                timer.started_remaining.saturating_sub(start.elapsed());
-                            if timer.remaining == Duration::ZERO {
-                                let prev_type = timer.session_type;
-                                timer.advance_session();
-                                notifications.push((
-                                    fl!("pomodoro-transition",
-                                        label = timer.label.clone(),
-                                        prev = prev_type.display_name(),
-                                        next = timer.session_type.display_name()
-                                    ),
-                                    timer.sound.clone(),
-                                ));
-                            }
+                    if timer.is_running
+                        && let Some(start) = timer.start_instant
+                    {
+                        timer.remaining =
+                            timer.started_remaining.saturating_sub(start.elapsed());
+                        if timer.remaining == Duration::ZERO {
+                            let prev_type = timer.session_type;
+                            timer.advance_session();
+                            notifications.push((
+                                fl!("pomodoro-transition",
+                                    label = timer.label.clone(),
+                                    prev = prev_type.display_name(),
+                                    next = timer.session_type.display_name()
+                                ),
+                                timer.sound.clone(),
+                            ));
                         }
                     }
                 }
