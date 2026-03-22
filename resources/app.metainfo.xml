@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.th3jk.clocks</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Clocks</name>
+  <summary>A clocks application for the COSMIC desktop</summary>
+  <description>
+    <p>
+      Clocks is a multi-feature time management application built for the COSMIC
+      desktop environment. It includes world clocks with timezone tracking, a
+      stopwatch with lap timing, configurable alarms with snooze support,
+      countdown timers with repeat mode, and pomodoro technique timers with
+      session management.
+    </p>
+  </description>
+  <developer id="dev.th3jk">
+    <name>th3jk</name>
+  </developer>
+  <url type="homepage">https://github.com/th3jk/clocks</url>
+  <url type="vcs-browser">https://github.com/th3jk/clocks</url>
+  <launchable type="desktop-id">dev.th3jk.clocks.desktop</launchable>
+  <provides>
+    <binary>clocks</binary>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+  <categories>
+    <category>Utility</category>
+    <category>Clock</category>
+  </categories>
+  <keywords>
+    <keyword>COSMIC</keyword>
+    <keyword>clock</keyword>
+    <keyword>timer</keyword>
+    <keyword>alarm</keyword>
+    <keyword>stopwatch</keyword>
+    <keyword>pomodoro</keyword>
+  </keywords>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2025-01-01">
+      <description>
+        <p>Initial release with world clocks, stopwatch, alarms, timers, and pomodoro.</p>
+      </description>
+    </release>
+  </releases>
+</component>

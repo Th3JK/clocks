@@ -1,0 +1,56 @@
+[package]
+name = "clocks"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "A clocks application for the COSMIC desktop"
+repository = "https://github.com/th3jk/clocks"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = { version = "0.10", features = ["serde"] }
+futures-util = "0.3.31"
+iana-time-zone = "0.1"
+notify-rust = "4"
+i18n-embed = { version = "0.16", features = [
+    "fluent-system",
+    "desktop-requester",
+] }
+i18n-embed-fl = "0.10"
+open = "5.3.2"
+rust-embed = "8.8.0"
+serde = { version = "1.0", features = ["derive"] }
+rodio = { version = "0.20", default-features = false, features = ["wav", "vorbis", "mp3"] }
+tokio = { version = "1.48.0", features = ["full"] }
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic.git"
+# See https://github.com/pop-os/libcosmic/blob/master/Cargo.toml for available features.
+features = [
+    # Accessibility support
+    "a11y",
+    # About widget for the app
+    "about",
+    # Uses cosmic-settings-daemon to watch for config file changes
+    "dbus-config",
+    # Support creating additional application windows.
+    "multi-window",
+    # On app startup, focuses an existing instance if the app is already open
+    "single-instance",
+    # Uses tokio as the executor for the runtime
+    "tokio",
+    # Windowing support for X11, Windows, Mac, & Redox
+    "winit",
+    # Add Wayland support to winit
+    "wayland",
+    # GPU-accelerated rendering
+    "wgpu",
+    # XDG portal for file dialogs
+    "xdg-portal",
+]
+
+# Uncomment to test a locally-cloned libcosmic
+# [patch.'https://github.com/pop-os/libcosmic']
+# libcosmic = { path = "../libcosmic" }
+# cosmic-config = { path = "../libcosmic/cosmic-config" }
+# cosmic-theme = { path = "../libcosmic/cosmic-theme" }

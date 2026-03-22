@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b2a6b"/>
+      <stop offset="100%" stop-color="#6a3cc7"/>
+    </linearGradient>
+
+    <linearGradient id="ringGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4da3ff"/>
+      <stop offset="100%" stop-color="#1b4db3"/>
+    </linearGradient>
+
+    <linearGradient id="handGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e6f0ff"/>
+      <stop offset="100%" stop-color="#bcd3ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer ring -->
+  <circle cx="128" cy="128" r="112" fill="url(#ringGradient)"/>
+
+  <!-- Clock face -->
+  <circle cx="128" cy="128" r="96" fill="url(#bgGradient)"/>
+
+  <!-- Hour marks -->
+  <g stroke="#7fc3ff" stroke-width="8" stroke-linecap="round">
+    <line x1="128" y1="40" x2="128" y2="60"/>
+    <line x1="216" y1="128" x2="196" y2="128"/>
+    <line x1="128" y1="216" x2="128" y2="196"/>
+    <line x1="40" y1="128" x2="60" y2="128"/>
+  </g>
+
+  <!-- Stars -->
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="90" cy="90" r="2"/>
+    <circle cx="170" cy="80" r="2"/>
+    <circle cx="190" cy="150" r="1.8"/>
+    <circle cx="70" cy="160" r="1.6"/>
+    <circle cx="140" cy="180" r="1.8"/>
+  </g>
+
+  <!-- Hour hand -->
+  <line x1="128" y1="128" x2="96" y2="104"
+        stroke="url(#handGradient)"
+        stroke-width="10"
+        stroke-linecap="round"/>
+
+  <!-- Minute hand -->
+  <line x1="128" y1="128" x2="176" y2="88"
+        stroke="url(#handGradient)"
+        stroke-width="8"
+        stroke-linecap="round"/>
+
+  <!-- Second hand -->
+  <line x1="128" y1="128" x2="150" y2="190"
+        stroke="#ffd84d"
+        stroke-width="4"
+        stroke-linecap="round"/>
+
+  <!-- Center hub -->
+  <circle cx="128" cy="128" r="8" fill="#8a5cff"/>
+
+</svg>

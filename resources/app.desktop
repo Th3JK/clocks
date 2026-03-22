@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Clocks
+Comment=A clocks application for the COSMIC desktop
+Type=Application
+Icon=dev.th3jk.clocks
+Exec=clocks %F
+Terminal=false
+StartupNotify=true
+Categories=Utility;Clock;
+Keywords=COSMIC;clock;timer;alarm;stopwatch;pomodoro;
