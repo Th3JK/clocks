@@ -113,6 +113,7 @@ impl WorldClocksState {
             .push(widget::text::title3(fl!("world-clocks-title")).width(Length::Fill))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                    .tooltip(fl!("tooltip-add"))
                     .on_press(Message::OpenAddSidebar),
             );
         col = col.push(header);
@@ -164,6 +165,7 @@ impl WorldClocksState {
                 let id = clock.id;
                 row = row.push(
                     widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                        .tooltip(fl!("tooltip-remove"))
                         .on_press(Message::RemoveClock(id)),
                 );
             }

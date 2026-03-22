@@ -220,6 +220,7 @@ impl StopwatchState {
             .push(widget::text::title3(fl!("stopwatch-title")).width(Length::Fill))
             .push(
                 widget::button::icon(widget::icon::from_name("addressbook-symbolic"))
+                    .tooltip(fl!("tooltip-history"))
                     .on_press(Message::OpenHistory),
             );
         col = col.push(header);

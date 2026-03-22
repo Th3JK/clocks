@@ -29,6 +29,16 @@ time-format = Формат времени
 time-format-24h = 24-часовой
 time-format-12h = 12-часовой (AM/PM)
 
+# Tooltips
+tooltip-add = Добавить
+tooltip-edit = Редактировать
+tooltip-delete = Удалить
+tooltip-remove = Убрать
+tooltip-start = Запустить
+tooltip-pause = Пауза
+tooltip-reset = Сбросить
+tooltip-history = История
+
 # Common labels
 label = Название
 time = Время

@@ -365,6 +365,7 @@ impl PomodoroState {
             .push(widget::text::title3(fl!("pomodoro-title")).width(Length::Fill))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                    .tooltip(fl!("tooltip-add"))
                     .on_press(Message::OpenSettings),
             );
         col = col.push(header);
@@ -393,11 +394,13 @@ impl PomodoroState {
             if !timer.is_running {
                 label_row = label_row.push(
                     widget::button::icon(widget::icon::from_name("edit-symbolic"))
+                        .tooltip(fl!("tooltip-edit"))
                         .on_press(Message::StartEditPomodoro(id)),
                 );
             }
             label_row = label_row.push(
                 widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                    .tooltip(fl!("tooltip-delete"))
                     .on_press(Message::Delete(id)),
             );
             col = col.push(label_row);
@@ -480,11 +483,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("work-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultWorkMinutes(w.saturating_sub(5))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = w.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultWorkMinutes(w + 5)),
                 );
             col = col.push(work_row);
@@ -496,11 +501,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("short-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultShortBreakMinutes(sb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = sb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultShortBreakMinutes(sb + 1)),
                 );
             col = col.push(short_row);
@@ -512,11 +519,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("long-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultLongBreakMinutes(lb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = lb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultLongBreakMinutes(lb + 1)),
                 );
             col = col.push(long_row);
@@ -557,11 +566,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("work-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultWorkMinutes(w.saturating_sub(5))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = w.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultWorkMinutes(w + 5)),
                 );
             col = col.push(work_row);
@@ -573,11 +584,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("short-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultShortBreakMinutes(sb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = sb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultShortBreakMinutes(sb + 1)),
                 );
             col = col.push(short_row);
@@ -589,11 +602,13 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("long-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::SetDefaultLongBreakMinutes(lb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = lb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::SetDefaultLongBreakMinutes(lb + 1)),
                 );
             col = col.push(long_row);

@@ -29,6 +29,16 @@ time-format = Formát času
 time-format-24h = 24hodinový
 time-format-12h = 12hodinový (AM/PM)
 
+# Tooltips
+tooltip-add = Přidat
+tooltip-edit = Upravit
+tooltip-delete = Smazat
+tooltip-remove = Odebrat
+tooltip-start = Spustit
+tooltip-pause = Pozastavit
+tooltip-reset = Resetovat
+tooltip-history = Historie
+
 # Common labels
 label = Název
 time = Čas

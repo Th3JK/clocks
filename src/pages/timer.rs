@@ -275,6 +275,7 @@ impl TimerState {
             .push(widget::text::title3(fl!("timer-title")).width(Length::Fill))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                    .tooltip(fl!("tooltip-add"))
                     .on_press(Message::StartNew),
             );
         col = col.push(header);
@@ -318,11 +319,13 @@ impl TimerState {
             if timer.is_running {
                 ctrl_row = ctrl_row.push(
                     widget::button::icon(widget::icon::from_name("media-playback-stop-symbolic"))
+                        .tooltip(fl!("tooltip-pause"))
                         .on_press(Message::PauseTimer(id)),
                 );
             } else if timer.remaining > Duration::ZERO {
                 ctrl_row = ctrl_row.push(
                     widget::button::icon(widget::icon::from_name("media-playback-start-symbolic"))
+                        .tooltip(fl!("tooltip-start"))
                         .on_press(if timer.remaining < timer.initial_duration {
                             Message::ResumeTimer(id)
                         } else {
@@ -337,6 +340,7 @@ impl TimerState {
 
             ctrl_row = ctrl_row.push(
                 widget::button::icon(widget::icon::from_name("edit-undo-symbolic"))
+                    .tooltip(fl!("tooltip-reset"))
                     .on_press(Message::ResetTimer(id)),
             );
 
@@ -345,11 +349,13 @@ impl TimerState {
             if !timer.is_running {
                 row = row.push(
                     widget::button::icon(widget::icon::from_name("edit-symbolic"))
+                        .tooltip(fl!("tooltip-edit"))
                         .on_press(Message::StartEditTimer(id)),
                 );
             }
             row = row.push(
                 widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                    .tooltip(fl!("tooltip-delete"))
                     .on_press(Message::DeleteTimer(id)),
             );
 
@@ -381,31 +387,37 @@ impl TimerState {
             .align_y(Alignment::Center)
             .push(
                 widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                     .on_press(Message::EditHours(if h == 0 { 23 } else { h - 1 })),
             )
             .push(widget::text::title3(format!("{:02}", h)))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                     .on_press(Message::EditHours((h + 1) % 24)),
             )
             .push(widget::text::title3(":"))
             .push(
                 widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                     .on_press(Message::EditMinutes(if m == 0 { 59 } else { m - 1 })),
             )
             .push(widget::text::title3(format!("{:02}", m)))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                     .on_press(Message::EditMinutes((m + 1) % 60)),
             )
             .push(widget::text::title3(":"))
             .push(
                 widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                     .on_press(Message::EditSeconds(if s == 0 { 59 } else { s - 1 })),
             )
             .push(widget::text::title3(format!("{:02}", s)))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                     .on_press(Message::EditSeconds((s + 1) % 60)),
             );
         col = col.push(dur_row);
@@ -434,11 +446,13 @@ impl TimerState {
                 .push(widget::text::body(fl!("repeat-count")))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+    
                         .on_press(Message::EditRepeatCount(c.saturating_sub(1))),
                 )
                 .push(widget::text::title4(count_label))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+    
                         .on_press(Message::EditRepeatCount(c + 1)),
                 );
             col = col.push(count_row);

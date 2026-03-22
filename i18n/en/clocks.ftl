@@ -29,6 +29,16 @@ time-format = Time Format
 time-format-24h = 24-hour
 time-format-12h = 12-hour (AM/PM)
 
+# Tooltips
+tooltip-add = Add
+tooltip-edit = Edit
+tooltip-delete = Delete
+tooltip-remove = Remove
+tooltip-start = Start
+tooltip-pause = Pause
+tooltip-reset = Reset
+tooltip-history = History
+
 # Common labels
 label = Label
 time = Time

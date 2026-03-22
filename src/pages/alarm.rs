@@ -504,6 +504,7 @@ impl AlarmState {
             .push(widget::text::title3(fl!("alarms-title")).width(Length::Fill))
             .push(
                 widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                    .tooltip(fl!("tooltip-add"))
                     .on_press(Message::StartNewAlarm),
             );
         col = col.push(header);
@@ -544,10 +545,12 @@ impl AlarmState {
                 )
                 .push(
                     widget::button::icon(widget::icon::from_name("edit-symbolic"))
+                        .tooltip(fl!("tooltip-edit"))
                         .on_press(Message::StartEditAlarm(id)),
                 )
                 .push(
                     widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                        .tooltip(fl!("tooltip-delete"))
                         .on_press(Message::DeleteAlarm(id)),
                 )
                 .push(
@@ -582,21 +585,25 @@ impl AlarmState {
                 .align_y(Alignment::Center)
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::DecrementHour),
                 )
                 .push(widget::text::title3(hour_str))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::IncrementHour),
                 )
                 .push(widget::text::title3(":"))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::DecrementMinute),
                 )
                 .push(widget::text::title3(minute_str))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::IncrementMinute),
                 );
             col = col.push(time_row);
@@ -675,11 +682,13 @@ impl AlarmState {
                 .align_y(Alignment::Center)
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::EditSnoozeMinutes(snz.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = snz.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::EditSnoozeMinutes(snz + 1)),
                 );
             col = col.push(snooze_row);
@@ -692,11 +701,13 @@ impl AlarmState {
                 .align_y(Alignment::Center)
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+
                         .on_press(Message::EditRingMinutes(ring.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = ring.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+
                         .on_press(Message::EditRingMinutes(ring + 1)),
                 );
             col = col.push(ring_row);
