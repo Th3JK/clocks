@@ -141,6 +141,7 @@ pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocks
         next_id,
         search_text: String::new(),
         filtered_timezones: Vec::new(),
+        selected_clock_id: None,
     }
 }
 

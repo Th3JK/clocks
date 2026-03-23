@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// World clocks update logic: search, add, and remove clocks.
+// World clocks update logic: search, add, remove, and detail navigation.
 
 use super::model::*;
 use super::{tz_city_name, Message};
@@ -40,10 +40,20 @@ impl WorldClocksState {
                 self.filtered_timezones.clear();
             }
             Message::RemoveClock(id) => {
-                self.clocks.retain(|c| c.id != id || c.is_local);
+                self.clocks.retain(|c| c.id != id);
+                // If the removed clock was selected, return to list view
+                if self.selected_clock_id == Some(id) {
+                    self.selected_clock_id = None;
+                }
             }
             Message::OpenAddSidebar => {
                 // Handled in app.rs
+            }
+            Message::SelectClock(id) => {
+                self.selected_clock_id = Some(id);
+            }
+            Message::DeselectClock => {
+                self.selected_clock_id = None;
             }
         }
     }

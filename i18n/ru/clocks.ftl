@@ -66,6 +66,14 @@ type-at-least-2 = Введите не менее 2 символов
 no-timezones-found = Часовые пояса не найдены
 timezone-added = { $name } (добавлено)
 add-clock = Добавить часы
+world-clocks-add-button = Добавить мировые часы…
+world-clocks-current-timezone = Текущий часовой пояс
+world-clocks-hours-ahead = На { $hours } часов впереди
+world-clocks-hours-behind = На { $hours } часов позади
+world-clocks-same-time = То же время
+world-clocks-detail-sunrise = Восход
+world-clocks-detail-sunset = Закат
+world-clocks-no-sun-data = --:--
 
 # Stopwatch
 stopwatch-title = Секундомер

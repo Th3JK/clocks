@@ -66,6 +66,14 @@ type-at-least-2 = Zadejte alespoň 2 znaky
 no-timezones-found = Žádná časová pásma nenalezena
 timezone-added = { $name } (přidáno)
 add-clock = Přidat hodiny
+world-clocks-add-button = Přidat světové hodiny…
+world-clocks-current-timezone = Aktuální časové pásmo
+world-clocks-hours-ahead = O { $hours } hodin napřed
+world-clocks-hours-behind = O { $hours } hodin pozadu
+world-clocks-same-time = Stejný čas
+world-clocks-detail-sunrise = Východ slunce
+world-clocks-detail-sunset = Západ slunce
+world-clocks-no-sun-data = --:--
 
 # Stopwatch
 stopwatch-title = Stopky

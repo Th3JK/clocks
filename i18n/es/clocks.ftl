@@ -66,6 +66,14 @@ type-at-least-2 = Escriba al menos 2 caracteres
 no-timezones-found = No se encontraron zonas horarias
 timezone-added = { $name } (añadido)
 add-clock = Añadir reloj
+world-clocks-add-button = Añadir reloj mundial…
+world-clocks-current-timezone = Zona horaria actual
+world-clocks-hours-ahead = { $hours } horas adelante
+world-clocks-hours-behind = { $hours } horas atrás
+world-clocks-same-time = Misma hora
+world-clocks-detail-sunrise = Amanecer
+world-clocks-detail-sunset = Atardecer
+world-clocks-no-sun-data = --:--
 
 # Stopwatch
 stopwatch-title = Cronómetro

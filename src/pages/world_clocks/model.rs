@@ -18,6 +18,7 @@ pub struct WorldClocksState {
     pub next_id: u32,
     pub search_text: String,
     pub filtered_timezones: Vec<(String, Tz)>,
+    pub selected_clock_id: Option<u32>,
 }
 
 impl Default for WorldClocksState {
@@ -27,21 +28,13 @@ impl Default for WorldClocksState {
             .and_then(|tz_str| tz_str.parse::<Tz>().ok())
             .unwrap_or(chrono_tz::UTC);
 
-        let city_name = super::tz_city_name(local_tz);
-
-        let local_clock = ClockEntry {
-            id: 0,
-            timezone: local_tz,
-            city_name,
-            is_local: true,
-        };
-
         Self {
             local_timezone: local_tz,
-            clocks: vec![local_clock],
-            next_id: 1,
+            clocks: Vec::new(),
+            next_id: 0,
             search_text: String::new(),
             filtered_timezones: Vec::new(),
+            selected_clock_id: None,
         }
     }
 }

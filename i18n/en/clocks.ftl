@@ -66,6 +66,14 @@ type-at-least-2 = Type at least 2 characters
 no-timezones-found = No timezones found
 timezone-added = { $name } (added)
 add-clock = Add Clock
+world-clocks-add-button = Add World Clock…
+world-clocks-current-timezone = Current timezone
+world-clocks-hours-ahead = { $hours } hours ahead
+world-clocks-hours-behind = { $hours } hours behind
+world-clocks-same-time = Same time
+world-clocks-detail-sunrise = Sunrise
+world-clocks-detail-sunset = Sunset
+world-clocks-no-sun-data = --:--
 
 # Stopwatch
 stopwatch-title = Stopwatch
