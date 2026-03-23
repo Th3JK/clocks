@@ -162,24 +162,29 @@ impl WorldClocksState {
                         }))
                         .padding([6, 14]);
 
-                // Delete button (nested — consumes its own click event)
+                // Clickable area: left + time pill
+                let clickable = widget::row::with_capacity(2)
+                    .spacing(spacing)
+                    .align_y(Alignment::Center)
+                    .push(left)
+                    .push(time_pill);
+
+                let row_btn = widget::button::custom(clickable)
+                    .width(Length::Fill)
+                    .on_press(Message::SelectClock(id))
+                    .class(cosmic::theme::Button::ListItem);
+
+                // Delete button sits outside the ListItem button
                 let delete_btn =
                     widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
                         .tooltip(fl!("tooltip-remove"))
                         .on_press(Message::RemoveClock(id));
 
-                // Full row content: left + time pill + delete button
-                let row_content = widget::row::with_capacity(3)
+                let row = widget::row::with_capacity(2)
                     .spacing(spacing)
                     .align_y(Alignment::Center)
-                    .push(left)
-                    .push(time_pill)
+                    .push(row_btn)
                     .push(delete_btn);
-
-                let row = widget::button::custom(row_content)
-                    .width(Length::Fill)
-                    .on_press(Message::SelectClock(id))
-                    .class(cosmic::theme::Button::ListItem);
 
                 list = list.add(row);
             }
