@@ -161,3 +161,31 @@ shortcuts-lap = Runde (Stoppuhr)
 shortcuts-reset = Zurücksetzen
 shortcuts-new-item = Neues Element
 shortcuts-skip-break = Pause überspringen (Pomodoro)
+
+# Settings — confirmation dialogs section
+settings-section-confirmation-dialogs = Confirmation dialogs
+settings-confirm-delete-alarm = Confirm before deleting an alarm
+settings-confirm-delete-timer = Confirm before deleting a timer
+settings-confirm-delete-world-clock = Confirm before deleting a world clock
+settings-confirm-delete-pomodoro = Confirm before deleting a pomodoro
+settings-confirm-clear-stopwatch = Confirm before clearing stopwatch history
+
+# Confirmation dialog — titles
+confirm-delete-alarm-title = Delete alarm?
+confirm-delete-timer-title = Delete timer?
+confirm-delete-world-clock-title = Delete world clock?
+confirm-delete-pomodoro-title = Delete pomodoro?
+confirm-clear-stopwatch-title = Clear history?
+
+# Confirmation dialog — body
+confirm-delete-alarm-body = This alarm will be permanently removed.
+confirm-delete-timer-body = This timer will be permanently removed.
+confirm-delete-world-clock-body = This world clock will be permanently removed.
+confirm-delete-pomodoro-body = This pomodoro will be permanently removed.
+confirm-clear-stopwatch-body = All lap and session history will be permanently cleared.
+
+# Confirmation dialog — shared
+confirm-dont-show-again = Don't show again
+confirm-button-cancel = Cancel
+confirm-button-delete = Delete
+confirm-button-clear = Clear

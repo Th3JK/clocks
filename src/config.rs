@@ -4,7 +4,7 @@ use chrono_tz::Tz;
 use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
 #[version = 3]
 pub struct Config {
     /// Saved world clocks (timezone names)
@@ -19,6 +19,39 @@ pub struct Config {
     pub pomodoro_defaults: PomodoroDefaults,
     /// Use 12-hour (AM/PM) time format instead of 24-hour
     pub use_12h: bool,
+    /// Confirmation dialog settings (default: true = show confirmation)
+    #[serde(default = "default_true")]
+    pub confirm_delete_alarm: bool,
+    #[serde(default = "default_true")]
+    pub confirm_delete_timer: bool,
+    #[serde(default = "default_true")]
+    pub confirm_delete_world_clock: bool,
+    #[serde(default = "default_true")]
+    pub confirm_delete_pomodoro: bool,
+    #[serde(default = "default_true")]
+    pub confirm_clear_stopwatch: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            world_clocks: Vec::new(),
+            alarms: Vec::new(),
+            timers: Vec::new(),
+            pomodoros: Vec::new(),
+            pomodoro_defaults: PomodoroDefaults::default(),
+            use_12h: false,
+            confirm_delete_alarm: true,
+            confirm_delete_timer: true,
+            confirm_delete_world_clock: true,
+            confirm_delete_pomodoro: true,
+            confirm_clear_stopwatch: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

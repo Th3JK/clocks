@@ -23,6 +23,26 @@ use std::time::Duration;
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/icon.svg");
 
+// --- Destructive action confirmation ---
+
+#[derive(Debug, Clone)]
+pub enum DestructiveAction {
+    DeleteAlarm(u32),
+    DeleteTimer(u32),
+    DeleteWorldClock(u32),
+    DeletePomodoro(u32),
+    ClearStopwatchHistory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmationCategory {
+    DeleteAlarm,
+    DeleteTimer,
+    DeleteWorldClock,
+    DeletePomodoro,
+    ClearStopwatch,
+}
+
 // --- Model ---
 
 pub struct AppModel {
@@ -35,6 +55,17 @@ pub struct AppModel {
     config_context: Option<cosmic_config::Config>,
     use_12h: bool,
     show_shortcuts_dialog: bool,
+
+    // Confirmation dialog state
+    pending_destructive_action: Option<DestructiveAction>,
+    confirm_dialog_dont_show_again: bool,
+
+    // Confirmation settings (mirrored from config)
+    confirm_delete_alarm: bool,
+    confirm_delete_timer: bool,
+    confirm_delete_world_clock: bool,
+    confirm_delete_pomodoro: bool,
+    confirm_clear_stopwatch: bool,
 
     // Page states (each page owns its own MVU model)
     world_clocks: world_clocks::WorldClocksState,
@@ -78,6 +109,11 @@ pub enum Message {
     PageShortcutSkip,
     ShowShortcutsDialog,
     CloseShortcutsDialog,
+    // Confirmation dialogs
+    ConfirmDestructiveAction,
+    CancelDestructiveAction,
+    ToggleConfirmDontShowAgain(bool),
+    ToggleConfirmationSetting(ConfirmationCategory, bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,6 +214,11 @@ impl cosmic::Application for AppModel {
         let pomodoro = restore_pomodoros(&config);
 
         let use_12h = config.use_12h;
+        let confirm_delete_alarm = config.confirm_delete_alarm;
+        let confirm_delete_timer = config.confirm_delete_timer;
+        let confirm_delete_world_clock = config.confirm_delete_world_clock;
+        let confirm_delete_pomodoro = config.confirm_delete_pomodoro;
+        let confirm_clear_stopwatch = config.confirm_clear_stopwatch;
 
         let mut app = AppModel {
             core,
@@ -189,6 +230,13 @@ impl cosmic::Application for AppModel {
             config_context,
             use_12h,
             show_shortcuts_dialog: false,
+            pending_destructive_action: None,
+            confirm_dialog_dont_show_again: false,
+            confirm_delete_alarm,
+            confirm_delete_timer,
+            confirm_delete_world_clock,
+            confirm_delete_pomodoro,
+            confirm_clear_stopwatch,
             world_clocks,
             stopwatch: stopwatch::StopwatchState::default(),
             alarm,
@@ -325,6 +373,10 @@ impl cosmic::Application for AppModel {
             return Some(dialog.into());
         }
 
+        if self.pending_destructive_action.is_some() {
+            return Some(self.confirmation_dialog_view());
+        }
+
         if self.show_shortcuts_dialog {
             return Some(self.shortcuts_dialog_view());
         }
@@ -354,6 +406,8 @@ impl cosmic::Application for AppModel {
                 | Message::UpdateConfig(_)
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
+                | Message::CancelDestructiveAction
+                | Message::ToggleConfirmDontShowAgain(_)
         );
 
         match message {
@@ -370,12 +424,33 @@ impl cosmic::Application for AppModel {
                         "world-clocks-search-input",
                     ));
                 }
+                world_clocks::Message::RemoveClock(id) => {
+                    if self.confirm_delete_world_clock
+                        && self.pending_destructive_action.is_none()
+                    {
+                        let id = *id;
+                        self.pending_destructive_action =
+                            Some(DestructiveAction::DeleteWorldClock(id));
+                        self.confirm_dialog_dont_show_again = false;
+                        return Task::none();
+                    }
+                    self.world_clocks.update(msg.clone());
+                }
                 _ => {
                     self.world_clocks.update(msg.clone());
                 }
             },
 
             Message::Alarm(ref msg) => match msg {
+                alarm::Message::DeleteAlarm(id) => {
+                    if self.confirm_delete_alarm && self.pending_destructive_action.is_none() {
+                        let id = *id;
+                        self.pending_destructive_action = Some(DestructiveAction::DeleteAlarm(id));
+                        self.confirm_dialog_dont_show_again = false;
+                        return Task::none();
+                    }
+                    self.alarm.update(msg.clone(), self.use_12h);
+                }
                 alarm::Message::StartNewAlarm | alarm::Message::StartEditAlarm(_) => {
                     self.alarm.update(msg.clone(), self.use_12h);
                     self.context_page = ContextPage::AlarmEdit;
@@ -406,6 +481,15 @@ impl cosmic::Application for AppModel {
             },
 
             Message::Timer(ref msg) => match msg {
+                timer::Message::DeleteTimer(id) => {
+                    if self.confirm_delete_timer && self.pending_destructive_action.is_none() {
+                        let id = *id;
+                        self.pending_destructive_action = Some(DestructiveAction::DeleteTimer(id));
+                        self.confirm_dialog_dont_show_again = false;
+                        return Task::none();
+                    }
+                    self.timer.update(msg.clone());
+                }
                 timer::Message::StartNew | timer::Message::StartEditTimer(_) => {
                     if let timer::Message::StartEditTimer(id) = msg {
                         self.active_timer_id = Some(*id);
@@ -448,12 +532,31 @@ impl cosmic::Application for AppModel {
                     self.context_page = ContextPage::StopwatchHistory;
                     self.core.window.show_context = true;
                 }
+                stopwatch::Message::ClearHistory => {
+                    if self.confirm_clear_stopwatch && self.pending_destructive_action.is_none() {
+                        self.pending_destructive_action =
+                            Some(DestructiveAction::ClearStopwatchHistory);
+                        self.confirm_dialog_dont_show_again = false;
+                        return Task::none();
+                    }
+                    self.stopwatch.update(msg.clone());
+                }
                 _ => {
                     self.stopwatch.update(msg.clone());
                 }
             },
 
             Message::Pomodoro(ref msg) => match msg {
+                pomodoro::Message::Delete(id) => {
+                    if self.confirm_delete_pomodoro && self.pending_destructive_action.is_none() {
+                        let id = *id;
+                        self.pending_destructive_action =
+                            Some(DestructiveAction::DeletePomodoro(id));
+                        self.confirm_dialog_dont_show_again = false;
+                        return Task::none();
+                    }
+                    self.pomodoro.update(msg.clone());
+                }
                 pomodoro::Message::OpenSettings | pomodoro::Message::StartEditPomodoro(_) => {
                     if let pomodoro::Message::StartEditPomodoro(id) = msg {
                         self.active_pomodoro_id = Some(*id);
@@ -502,6 +605,11 @@ impl cosmic::Application for AppModel {
 
             Message::UpdateConfig(config) => {
                 self.use_12h = config.use_12h;
+                self.confirm_delete_alarm = config.confirm_delete_alarm;
+                self.confirm_delete_timer = config.confirm_delete_timer;
+                self.confirm_delete_world_clock = config.confirm_delete_world_clock;
+                self.confirm_delete_pomodoro = config.confirm_delete_pomodoro;
+                self.confirm_clear_stopwatch = config.confirm_clear_stopwatch;
                 self.config = config;
             }
 
@@ -580,6 +688,73 @@ impl cosmic::Application for AppModel {
 
             Message::CloseShortcutsDialog => {
                 self.show_shortcuts_dialog = false;
+            }
+
+            Message::ConfirmDestructiveAction => {
+                if self.confirm_dialog_dont_show_again {
+                    match &self.pending_destructive_action {
+                        Some(DestructiveAction::DeleteAlarm(_)) => {
+                            self.confirm_delete_alarm = false;
+                        }
+                        Some(DestructiveAction::DeleteTimer(_)) => {
+                            self.confirm_delete_timer = false;
+                        }
+                        Some(DestructiveAction::DeleteWorldClock(_)) => {
+                            self.confirm_delete_world_clock = false;
+                        }
+                        Some(DestructiveAction::DeletePomodoro(_)) => {
+                            self.confirm_delete_pomodoro = false;
+                        }
+                        Some(DestructiveAction::ClearStopwatchHistory) => {
+                            self.confirm_clear_stopwatch = false;
+                        }
+                        None => {}
+                    }
+                }
+                match self.pending_destructive_action.take() {
+                    Some(DestructiveAction::DeleteAlarm(id)) => {
+                        self.alarm.update(alarm::Message::DeleteAlarm(id), self.use_12h);
+                    }
+                    Some(DestructiveAction::DeleteTimer(id)) => {
+                        self.timer.update(timer::Message::DeleteTimer(id));
+                    }
+                    Some(DestructiveAction::DeleteWorldClock(id)) => {
+                        self.world_clocks.update(world_clocks::Message::RemoveClock(id));
+                    }
+                    Some(DestructiveAction::DeletePomodoro(id)) => {
+                        self.pomodoro.update(pomodoro::Message::Delete(id));
+                    }
+                    Some(DestructiveAction::ClearStopwatchHistory) => {
+                        self.stopwatch.update(stopwatch::Message::ClearHistory);
+                    }
+                    None => {}
+                }
+                self.confirm_dialog_dont_show_again = false;
+            }
+
+            Message::CancelDestructiveAction => {
+                self.pending_destructive_action = None;
+                self.confirm_dialog_dont_show_again = false;
+            }
+
+            Message::ToggleConfirmDontShowAgain(val) => {
+                self.confirm_dialog_dont_show_again = val;
+            }
+
+            Message::ToggleConfirmationSetting(category, enabled) => {
+                match category {
+                    ConfirmationCategory::DeleteAlarm => self.confirm_delete_alarm = enabled,
+                    ConfirmationCategory::DeleteTimer => self.confirm_delete_timer = enabled,
+                    ConfirmationCategory::DeleteWorldClock => {
+                        self.confirm_delete_world_clock = enabled;
+                    }
+                    ConfirmationCategory::DeletePomodoro => {
+                        self.confirm_delete_pomodoro = enabled;
+                    }
+                    ConfirmationCategory::ClearStopwatch => {
+                        self.confirm_clear_stopwatch = enabled;
+                    }
+                }
             }
 
             Message::LaunchUrl(url) => match open::that_detached(&url) {
@@ -676,6 +851,11 @@ impl AppModel {
             &self.timer,
             &self.pomodoro,
             self.use_12h,
+            self.confirm_delete_alarm,
+            self.confirm_delete_timer,
+            self.confirm_delete_world_clock,
+            self.confirm_delete_pomodoro,
+            self.confirm_clear_stopwatch,
         );
         if let Err(e) = config.write_entry(ctx) {
             eprintln!("Failed to save config: {:?}", e);
@@ -702,7 +882,7 @@ impl AppModel {
 
     fn settings_view(&self) -> Element<'_, Message> {
         let spacing = 12;
-        let mut col = widget::column::with_capacity(4).spacing(spacing);
+        let mut col = widget::column::with_capacity(12).spacing(spacing);
 
         col = col.push(widget::text::body(fl!("time-format")));
 
@@ -723,6 +903,45 @@ impl AppModel {
             .push(btn_24h)
             .push(btn_12h);
         col = col.push(row);
+
+        col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-confirmation-dialogs")));
+
+        col = col.push(
+            widget::checkbox(self.confirm_delete_alarm)
+                .label(fl!("settings-confirm-delete-alarm"))
+                .on_toggle(|v| {
+                    Message::ToggleConfirmationSetting(ConfirmationCategory::DeleteAlarm, v)
+                }),
+        );
+        col = col.push(
+            widget::checkbox(self.confirm_delete_timer)
+                .label(fl!("settings-confirm-delete-timer"))
+                .on_toggle(|v| {
+                    Message::ToggleConfirmationSetting(ConfirmationCategory::DeleteTimer, v)
+                }),
+        );
+        col = col.push(
+            widget::checkbox(self.confirm_delete_world_clock)
+                .label(fl!("settings-confirm-delete-world-clock"))
+                .on_toggle(|v| {
+                    Message::ToggleConfirmationSetting(ConfirmationCategory::DeleteWorldClock, v)
+                }),
+        );
+        col = col.push(
+            widget::checkbox(self.confirm_delete_pomodoro)
+                .label(fl!("settings-confirm-delete-pomodoro"))
+                .on_toggle(|v| {
+                    Message::ToggleConfirmationSetting(ConfirmationCategory::DeletePomodoro, v)
+                }),
+        );
+        col = col.push(
+            widget::checkbox(self.confirm_clear_stopwatch)
+                .label(fl!("settings-confirm-clear-stopwatch"))
+                .on_toggle(|v| {
+                    Message::ToggleConfirmationSetting(ConfirmationCategory::ClearStopwatch, v)
+                }),
+        );
 
         col.into()
     }
@@ -940,6 +1159,55 @@ impl AppModel {
         dialog.into()
     }
 
+    fn confirmation_dialog_view(&self) -> Element<'_, Message> {
+        let (title, body, confirm_label) = match &self.pending_destructive_action {
+            Some(DestructiveAction::DeleteAlarm(_)) => (
+                fl!("confirm-delete-alarm-title"),
+                fl!("confirm-delete-alarm-body"),
+                fl!("confirm-button-delete"),
+            ),
+            Some(DestructiveAction::DeleteTimer(_)) => (
+                fl!("confirm-delete-timer-title"),
+                fl!("confirm-delete-timer-body"),
+                fl!("confirm-button-delete"),
+            ),
+            Some(DestructiveAction::DeleteWorldClock(_)) => (
+                fl!("confirm-delete-world-clock-title"),
+                fl!("confirm-delete-world-clock-body"),
+                fl!("confirm-button-delete"),
+            ),
+            Some(DestructiveAction::DeletePomodoro(_)) => (
+                fl!("confirm-delete-pomodoro-title"),
+                fl!("confirm-delete-pomodoro-body"),
+                fl!("confirm-button-delete"),
+            ),
+            Some(DestructiveAction::ClearStopwatchHistory) => (
+                fl!("confirm-clear-stopwatch-title"),
+                fl!("confirm-clear-stopwatch-body"),
+                fl!("confirm-button-clear"),
+            ),
+            None => return widget::text::body("").into(),
+        };
+
+        let dont_show = widget::checkbox(self.confirm_dialog_dont_show_again)
+            .label(fl!("confirm-dont-show-again"))
+            .on_toggle(Message::ToggleConfirmDontShowAgain);
+
+        widget::dialog()
+            .title(title)
+            .body(body)
+            .control(dont_show)
+            .primary_action(
+                widget::button::destructive(confirm_label)
+                    .on_press(Message::ConfirmDestructiveAction),
+            )
+            .secondary_action(
+                widget::button::standard(fl!("confirm-button-cancel"))
+                    .on_press(Message::CancelDestructiveAction),
+            )
+            .into()
+    }
+
     fn shortcut_row<'a>(action: String, keys: &'a [&'a str]) -> Element<'a, Message> {
         use cosmic::iced::widget::container as iced_container;
         use cosmic::iced_core::{Background, Border};
@@ -1109,12 +1377,18 @@ fn open_sound_file_dialog(target: CustomSoundTarget) -> Task<cosmic::Action<Mess
 
 // --- Persistence: build Config from runtime state ---
 
+#[allow(clippy::too_many_arguments)]
 fn build_config_from_state(
     wc: &world_clocks::WorldClocksState,
     al: &alarm::AlarmState,
     ti: &timer::TimerState,
     po: &pomodoro::PomodoroState,
     use_12h: bool,
+    confirm_delete_alarm: bool,
+    confirm_delete_timer: bool,
+    confirm_delete_world_clock: bool,
+    confirm_delete_pomodoro: bool,
+    confirm_clear_stopwatch: bool,
 ) -> Config {
     let world_clocks = wc
         .clocks
@@ -1187,6 +1461,11 @@ fn build_config_from_state(
         pomodoros,
         pomodoro_defaults,
         use_12h,
+        confirm_delete_alarm,
+        confirm_delete_timer,
+        confirm_delete_world_clock,
+        confirm_delete_pomodoro,
+        confirm_clear_stopwatch,
     }
 }
 
