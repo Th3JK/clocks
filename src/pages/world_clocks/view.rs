@@ -1,105 +1,16 @@
 // SPDX-License-Identifier: MIT
+//
+// World clocks view functions: main page view and sidebar search.
 
+use super::model::*;
+use super::Message;
 use crate::fl;
 use chrono::{Offset, TimeZone, Utc};
-use chrono_tz::Tz;
 use cosmic::iced::{Alignment, Length};
 use cosmic::prelude::*;
 use cosmic::widget;
 
-#[derive(Debug, Clone)]
-pub struct ClockEntry {
-    pub id: u32,
-    pub timezone: Tz,
-    pub city_name: String,
-    pub is_local: bool,
-}
-
-pub struct WorldClocksState {
-    pub local_timezone: Tz,
-    pub clocks: Vec<ClockEntry>,
-    pub next_id: u32,
-    pub search_text: String,
-    pub filtered_timezones: Vec<(String, Tz)>,
-}
-
-impl Default for WorldClocksState {
-    fn default() -> Self {
-        let local_tz = iana_time_zone::get_timezone()
-            .ok()
-            .and_then(|tz_str| tz_str.parse::<Tz>().ok())
-            .unwrap_or(chrono_tz::UTC);
-
-        let city_name = tz_city_name(local_tz);
-
-        let local_clock = ClockEntry {
-            id: 0,
-            timezone: local_tz,
-            city_name,
-            is_local: true,
-        };
-
-        Self {
-            local_timezone: local_tz,
-            clocks: vec![local_clock],
-            next_id: 1,
-            search_text: String::new(),
-            filtered_timezones: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    SearchChanged(String),
-    AddClock(Tz),
-    RemoveClock(u32),
-    OpenAddSidebar,
-}
-
 impl WorldClocksState {
-    pub fn update(&mut self, message: Message) {
-        match message {
-            Message::SearchChanged(text) => {
-                self.search_text = text.clone();
-                if text.len() >= 2 {
-                    let lower = text.to_lowercase();
-                    self.filtered_timezones = chrono_tz::TZ_VARIANTS
-                        .iter()
-                        .filter(|tz| {
-                            let name = tz.name().to_lowercase();
-                            name.contains(&lower)
-                                || tz_city_name(**tz).to_lowercase().contains(&lower)
-                        })
-                        .take(20)
-                        .map(|tz| (tz_city_name(*tz), *tz))
-                        .collect();
-                } else {
-                    self.filtered_timezones.clear();
-                }
-            }
-            Message::AddClock(tz) => {
-                if !self.clocks.iter().any(|c| c.timezone == tz) {
-                    self.clocks.push(ClockEntry {
-                        id: self.next_id,
-                        timezone: tz,
-                        city_name: tz_city_name(tz),
-                        is_local: false,
-                    });
-                    self.next_id += 1;
-                }
-                self.search_text.clear();
-                self.filtered_timezones.clear();
-            }
-            Message::RemoveClock(id) => {
-                self.clocks.retain(|c| c.id != id || c.is_local);
-            }
-            Message::OpenAddSidebar => {
-                // Handled in app.rs
-            }
-        }
-    }
-
     /// Main view: page header + clock list
     pub fn view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = 12;
@@ -216,12 +127,4 @@ impl WorldClocksState {
 
         col.into()
     }
-}
-
-fn tz_city_name(tz: Tz) -> String {
-    let name = tz.name();
-    name.rsplit('/')
-        .next()
-        .unwrap_or(name)
-        .replace('_', " ")
 }
