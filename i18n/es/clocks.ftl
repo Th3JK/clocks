@@ -37,6 +37,8 @@ tooltip-remove = Quitar
 tooltip-start = Iniciar
 tooltip-pause = Pausar
 tooltip-reset = Reiniciar
+tooltip-resume = Reanudar
+tooltip-lap = Vuelta
 tooltip-history = Historial
 
 # Common labels
@@ -74,6 +76,8 @@ world-clocks-same-time = Misma hora
 world-clocks-detail-sunrise = Amanecer
 world-clocks-detail-sunset = Atardecer
 world-clocks-no-sun-data = --:--
+tooltip-edit-mode = Editar
+tooltip-done-editing = Listo
 
 # Stopwatch
 stopwatch-title = Cronómetro

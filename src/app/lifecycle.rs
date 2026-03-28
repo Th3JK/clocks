@@ -419,6 +419,10 @@ impl cosmic::Application for AppModel {
                     }
                     self.stopwatch.update(msg.clone());
                 }
+                stopwatch::Message::ResumeFromHistory(_) => {
+                    self.stopwatch.update(msg.clone());
+                    self.core.window.show_context = false;
+                }
                 _ => {
                     self.stopwatch.update(msg.clone());
                 }

@@ -37,6 +37,8 @@ tooltip-remove = Remove
 tooltip-start = Start
 tooltip-pause = Pause
 tooltip-reset = Reset
+tooltip-resume = Resume
+tooltip-lap = Lap
 tooltip-history = History
 
 # Common labels

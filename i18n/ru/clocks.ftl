@@ -37,6 +37,8 @@ tooltip-remove = Убрать
 tooltip-start = Запустить
 tooltip-pause = Пауза
 tooltip-reset = Сбросить
+tooltip-resume = Продолжить
+tooltip-lap = Круг
 tooltip-history = История
 
 # Common labels
@@ -74,6 +76,8 @@ world-clocks-same-time = То же время
 world-clocks-detail-sunrise = Восход
 world-clocks-detail-sunset = Закат
 world-clocks-no-sun-data = --:--
+tooltip-edit-mode = Редактировать
+tooltip-done-editing = Готово
 
 # Stopwatch
 stopwatch-title = Секундомер

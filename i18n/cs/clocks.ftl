@@ -37,6 +37,8 @@ tooltip-remove = Odebrat
 tooltip-start = Spustit
 tooltip-pause = Pozastavit
 tooltip-reset = Resetovat
+tooltip-resume = Pokračovat
+tooltip-lap = Kolo
 tooltip-history = Historie
 
 # Common labels
@@ -74,6 +76,8 @@ world-clocks-same-time = Stejný čas
 world-clocks-detail-sunrise = Východ slunce
 world-clocks-detail-sunset = Západ slunce
 world-clocks-no-sun-data = --:--
+tooltip-edit-mode = Upravit
+tooltip-done-editing = Hotovo
 
 # Stopwatch
 stopwatch-title = Stopky
