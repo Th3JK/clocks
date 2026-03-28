@@ -30,6 +30,38 @@ const NIGHT_PILL_COLOR: Color = Color {
 };
 
 impl WorldClocksState {
+    /// Returns `true` if the current local time in `tz` is between sunrise and sunset.
+    /// Falls back to the 06:00–20:00 range when coordinates are unavailable.
+    fn is_daytime(tz: chrono_tz::Tz) -> bool {
+        let now_utc = Utc::now();
+        let local = now_utc.with_timezone(&tz);
+        let date = local.date_naive();
+
+        if let Some((lat, lon)) = approximate_coords(tz.name()) {
+            if let Some(coord) = Coordinates::new(lat, lon) {
+                if let Some(nd) = NaiveDate::from_ymd_opt(date.year(), date.month(), date.day()) {
+                    let solar = SolarDay::new(coord, nd);
+                    let sunrise = solar.event_time(SolarEvent::Sunrise);
+                    let sunset = solar.event_time(SolarEvent::Sunset);
+                    return now_utc >= sunrise && now_utc < sunset;
+                }
+            }
+        }
+
+        // Fallback: simple hour-based check
+        let hour = local.hour();
+        (6..20).contains(&hour)
+    }
+
+    /// Returns the pill background color for a timezone based on actual sunrise/sunset.
+    fn pill_color(tz: chrono_tz::Tz) -> Color {
+        if Self::is_daytime(tz) {
+            DAY_PILL_COLOR
+        } else {
+            NIGHT_PILL_COLOR
+        }
+    }
+
     /// Compute the offset in whole hours between the given timezone and the local timezone.
     fn offset_hours_from_local(&self, tz: chrono_tz::Tz) -> f64 {
         let now_utc = Utc::now();
@@ -107,13 +139,7 @@ impl WorldClocksState {
                 let offset_str = self.offset_description(clock.timezone);
                 let id = clock.id;
 
-                // Determine day/night pill color based on local hour
-                let local_hour = time_in_tz.hour();
-                let pill_bg = if (6..20).contains(&local_hour) {
-                    DAY_PILL_COLOR
-                } else {
-                    NIGHT_PILL_COLOR
-                };
+                let pill_bg = Self::pill_color(clock.timezone);
 
                 // Left side: city name + offset description
                 let left = widget::column::with_capacity(2)
@@ -229,13 +255,7 @@ impl WorldClocksState {
                     let offset_str = self.offset_description(clock.timezone);
                     let id = clock.id;
 
-                    // Day/night time pill — same as view mode
-                    let local_hour = time_in_tz.hour();
-                    let pill_bg = if (6..20).contains(&local_hour) {
-                        DAY_PILL_COLOR
-                    } else {
-                        NIGHT_PILL_COLOR
-                    };
+                    let pill_bg = Self::pill_color(clock.timezone);
                     let time_pill = widget::container(
                         widget::text::title4(time_str).font(cosmic::font::bold()),
                     )
@@ -324,12 +344,7 @@ impl WorldClocksState {
                     } else {
                         time_in_tz.format("%H:%M").to_string()
                     };
-                    let local_hour = time_in_tz.hour();
-                    let pill_bg = if (6..20).contains(&local_hour) {
-                        DAY_PILL_COLOR
-                    } else {
-                        NIGHT_PILL_COLOR
-                    };
+                    let pill_bg = Self::pill_color(clock.timezone);
                     (clock.city_name.clone(), time_str, pill_bg)
                 })
                 .collect();
