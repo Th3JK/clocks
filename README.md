@@ -4,7 +4,7 @@ A clocks application for the COSMIC™ desktop environment.
 
 ## Features
 
-- **World Clocks** — track time across multiple timezones with live offset display
+- **World Clocks** — track time across multiple timezones with live offset display, detail view with sunrise/sunset, edit mode with drag-to-reorder
 - **Stopwatch** — precision stopwatch with lap tracking, delta comparison, and session history
 - **Alarm** — configurable alarms with repeat modes, snooze, custom sounds, and floating dialog notifications
 - **Timer** — countdown timers with repeat support and sound alerts
@@ -21,7 +21,13 @@ The codebase follows the COSMIC [MVU (Model-View-Update)][mvu] architecture:
 ```
 src/
 ├── main.rs                        # Entry point
-├── app.rs                         # Application orchestrator (Model + View + Update)
+├── app/                           # Application orchestrator
+│   ├── mod.rs                     #   Model definition and top-level types
+│   ├── lifecycle.rs               #   cosmic::Application trait (View + Update)
+│   ├── persistence.rs             #   Config ↔ runtime state conversion
+│   ├── subscriptions.rs           #   Tick, input, and file-dialog subscriptions
+│   ├── dialogs.rs                 #   Confirmation and shortcuts dialog views
+│   └── helpers.rs                 #   Page shortcut handlers and settings view
 ├── audio.rs                       # Audio playback and desktop notifications
 ├── config.rs                      # Config persistence structs
 ├── i18n.rs                        # Localization (Fluent)
@@ -30,10 +36,16 @@ src/
 │   ├── timer.rs
 │   ├── pomodoro.rs
 │   ├── stopwatch.rs
-│   └── world_clocks.rs
+│   └── world_clocks/              #   Split into model, view, update, coords
+│       ├── mod.rs
+│       ├── model.rs
+│       ├── view.rs
+│       ├── update.rs
+│       └── coords.rs
 └── components/                    # Reusable UI components
     ├── sound_selector.rs
-    └── duration.rs
+    ├── duration.rs
+    └── reorder_list.rs            #   Drag-to-reorder widget (Wayland DnD)
 ```
 
 ## Installation
