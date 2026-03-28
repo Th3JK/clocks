@@ -23,6 +23,8 @@ pub(super) fn build_config_from_state(
     confirm_delete_world_clock: bool,
     confirm_delete_pomodoro: bool,
     confirm_clear_stopwatch: bool,
+    auto_sort_alarms: bool,
+    auto_sort_world_clocks: bool,
 ) -> Config {
     let world_clocks = wc
         .clocks
@@ -100,6 +102,8 @@ pub(super) fn build_config_from_state(
         confirm_delete_world_clock,
         confirm_delete_pomodoro,
         confirm_clear_stopwatch,
+        auto_sort_alarms,
+        auto_sort_world_clocks,
     }
 }
 
@@ -207,6 +211,9 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
         last_triggered_minute: None,
         ringing: Vec::new(),
         snoozed: Vec::new(),
+        edit_mode: false,
+        dragging_index: None,
+        pre_drag_order: Vec::new(),
     }
 }
 

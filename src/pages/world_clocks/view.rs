@@ -94,7 +94,7 @@ impl WorldClocksState {
     }
 
     /// Main view: page header + clock list, empty state, or detail view.
-    pub fn view(&self, use_12h: bool) -> Element<'_, Message> {
+    pub fn view(&self, use_12h: bool, auto_sort: bool) -> Element<'_, Message> {
         // If a clock is selected and still exists, show the detail view
         if let Some(id) = self.selected_clock_id
             && let Some(clock) = self.clocks.iter().find(|c| c.id == id)
@@ -103,7 +103,7 @@ impl WorldClocksState {
         }
 
         if self.edit_mode {
-            self.edit_mode_view(use_12h)
+            self.edit_mode_view(use_12h, auto_sort)
         } else {
             self.list_view(use_12h)
         }
@@ -193,12 +193,9 @@ impl WorldClocksState {
         col.into()
     }
 
-    /// Edit mode view: drag handles, card rows, delete buttons.
-    ///
-    /// Follows the cosmic-settings panel applet list pattern:
-    /// each row is an inline card built with standard cosmic primitives,
-    /// wrapped in a `ReorderList` widget for drag-to-reorder via Wayland DnD.
-    fn edit_mode_view(&self, use_12h: bool) -> Element<'_, Message> {
+    /// Edit mode view: card rows with delete buttons.
+    /// When `auto_sort` is false, drag handles and ReorderList are shown for manual reordering.
+    fn edit_mode_view(&self, use_12h: bool, auto_sort: bool) -> Element<'_, Message> {
         let cosmic::cosmic_theme::Spacing {
             space_xxxs,
             space_xxs,
@@ -215,7 +212,7 @@ impl WorldClocksState {
         if self.clocks.is_empty() {
             col = col.push(self.empty_state());
         } else {
-            let dragging = self.dragging_index;
+            let dragging = if auto_sort { None } else { self.dragging_index };
 
             let card_rows: Vec<Element<'_, Message>> = self
                 .clocks
@@ -272,44 +269,56 @@ impl WorldClocksState {
                     }))
                     .padding([6, 14]);
 
-                    // Row content: drag handle | icon | text block | time pill | delete button
-                    let content = widget::row::with_children(vec![
-                        // Drag handle
-                        widget::icon::from_name("grip-lines-symbolic")
-                            .size(16)
-                            .icon()
-                            .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
-                                    color: Some(theme.cosmic().palette.neutral_7.into()),
-                                },
-                            )))
-                            .into(),
-                        // Clock icon
+                    // Row content: [drag handle] | icon | text block | time pill | delete button
+                    let mut items: Vec<Element<'_, Message>> = Vec::with_capacity(5);
+
+                    // Drag handle — only when manual ordering
+                    if !auto_sort {
+                        items.push(
+                            widget::icon::from_name("grip-lines-symbolic")
+                                .size(16)
+                                .icon()
+                                .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                        color: Some(theme.cosmic().palette.neutral_7.into()),
+                                    },
+                                )))
+                                .into(),
+                        );
+                    }
+
+                    // Clock icon
+                    items.push(
                         widget::icon::from_name("preferences-system-time-symbolic")
                             .size(20)
                             .icon()
                             .into(),
-                        // Text block: city name (primary) + offset (secondary)
+                    );
+                    // Text block: city name (primary) + offset (secondary)
+                    items.push(
                         widget::column::with_capacity(2)
                             .spacing(space_xxxs)
                             .width(Length::Fill)
                             .push(widget::text::body(&clock.city_name))
                             .push(widget::text::caption(offset_str))
                             .into(),
-                        // Time pill
-                        time_pill.into(),
-                        // Delete button
+                    );
+                    // Time pill
+                    items.push(time_pill.into());
+                    // Delete button
+                    items.push(
                         widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
                             .extra_small()
                             .tooltip(fl!("tooltip-remove"))
                             .on_press(Message::RemoveClock(id))
                             .into(),
-                    ])
-                    .spacing(space_xs)
-                    .align_y(Alignment::Center);
+                    );
 
-                    // Card container: bg_component_color background, radius_s corners,
-                    // accent border when this is the item being dragged elsewhere
+                    let content = widget::row::with_children(items)
+                        .spacing(space_xs)
+                        .align_y(Alignment::Center);
+
+                    // Card container
                     widget::container(content)
                         .padding(8)
                         .width(Length::Fill)
@@ -330,73 +339,79 @@ impl WorldClocksState {
                 })
                 .collect();
 
-            let item_count = self.clocks.len();
             let cards = widget::column::with_children(card_rows).spacing(space_xxs);
 
-            // Pre-clone clock data for the drag icon builder ('static closure)
-            let clocks_snapshot: Vec<(String, String, Color)> = self
-                .clocks
-                .iter()
-                .map(|clock| {
-                    let time_in_tz = now_utc.with_timezone(&clock.timezone);
-                    let time_str = if use_12h {
-                        time_in_tz.format("%I:%M %p").to_string()
-                    } else {
-                        time_in_tz.format("%H:%M").to_string()
-                    };
-                    let pill_bg = Self::pill_color(clock.timezone);
-                    (clock.city_name.clone(), time_str, pill_bg)
-                })
-                .collect();
+            if auto_sort {
+                // No drag-to-reorder when auto-sorting
+                col = col.push(cards);
+            } else {
+                let item_count = self.clocks.len();
 
-            let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
-                .on_start_drag(Message::StartDrag)
-                .on_reorder(|from, to| Message::Reorder(from, to))
-                .on_finish(Message::FinishDrag)
-                .on_cancel(Message::CancelDrag)
-                .drag_icon(move |index, offset| {
-                    let (city, time_str, pill_bg) = clocks_snapshot
-                        .get(index)
-                        .cloned()
-                        .unwrap_or_else(|| ("Clock".to_string(), String::new(), DAY_PILL_COLOR));
+                // Pre-clone clock data for the drag icon builder ('static closure)
+                let clocks_snapshot: Vec<(String, String, Color)> = self
+                    .clocks
+                    .iter()
+                    .map(|clock| {
+                        let time_in_tz = now_utc.with_timezone(&clock.timezone);
+                        let time_str = if use_12h {
+                            time_in_tz.format("%I:%M %p").to_string()
+                        } else {
+                            time_in_tz.format("%H:%M").to_string()
+                        };
+                        let pill_bg = Self::pill_color(clock.timezone);
+                        (clock.city_name.clone(), time_str, pill_bg)
+                    })
+                    .collect();
 
-                    let time_pill = widget::container(
-                        widget::text::title4(time_str).font(cosmic::font::bold()),
-                    )
-                    .class(cosmic::theme::Container::custom(move |_theme| {
-                        cosmic::iced_widget::container::Style {
-                            background: Some(cosmic::iced::Background::Color(pill_bg)),
-                            border: cosmic::iced::Border {
-                                radius: 8.0.into(),
+                let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
+                    .on_start_drag(Message::StartDrag)
+                    .on_reorder(|from, to| Message::Reorder(from, to))
+                    .on_finish(Message::FinishDrag)
+                    .on_cancel(Message::CancelDrag)
+                    .drag_icon(move |index, offset| {
+                        let (city, time_str, pill_bg) = clocks_snapshot
+                            .get(index)
+                            .cloned()
+                            .unwrap_or_else(|| {
+                                ("Clock".to_string(), String::new(), DAY_PILL_COLOR)
+                            });
+
+                        let time_pill = widget::container(
+                            widget::text::title4(time_str).font(cosmic::font::bold()),
+                        )
+                        .class(cosmic::theme::Container::custom(move |_theme| {
+                            cosmic::iced_widget::container::Style {
+                                background: Some(cosmic::iced::Background::Color(pill_bg)),
+                                border: cosmic::iced::Border {
+                                    radius: 8.0.into(),
+                                    ..Default::default()
+                                },
+                                text_color: Some(Color::WHITE),
                                 ..Default::default()
-                            },
-                            text_color: Some(Color::WHITE),
-                            ..Default::default()
-                        }
-                    }))
-                    .padding([6, 14]);
+                            }
+                        }))
+                        .padding([6, 14]);
 
-                    let content = widget::row::with_children(vec![
-                        widget::icon::from_name("grip-lines-symbolic")
-                            .size(16)
-                            .icon()
-                            .into(),
-                        widget::icon::from_name("preferences-system-time-symbolic")
-                            .size(20)
-                            .icon()
-                            .into(),
-                        widget::text::body(city).width(Length::Fill).into(),
-                        time_pill.into(),
-                    ])
-                    .spacing(space_xs)
-                    .align_y(Alignment::Center);
+                        let content = widget::row::with_children(vec![
+                            widget::icon::from_name("grip-lines-symbolic")
+                                .size(16)
+                                .icon()
+                                .into(),
+                            widget::icon::from_name("preferences-system-time-symbolic")
+                                .size(20)
+                                .icon()
+                                .into(),
+                            widget::text::body(city).width(Length::Fill).into(),
+                            time_pill.into(),
+                        ])
+                        .spacing(space_xs)
+                        .align_y(Alignment::Center);
 
-                    // Card with accent border for the floating drag icon
-                    let card: Element<'static, ()> = widget::container(content)
-                        .padding(8)
-                        .width(Length::Fill)
-                        .class(cosmic::theme::Container::Custom(Box::new(
-                            |theme| {
+                        // Card with accent border for the floating drag icon
+                        let card: Element<'static, ()> = widget::container(content)
+                            .padding(8)
+                            .width(Length::Fill)
+                            .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
                                 let mut style = cosmic::iced_widget::container::Catalog::style(
                                     theme,
@@ -409,14 +424,14 @@ impl WorldClocksState {
                                     Color::from(theme.cosmic().bg_component_color()).into(),
                                 );
                                 style
-                            },
-                        )))
-                        .into();
+                            })))
+                            .into();
 
-                    (card, cosmic::iced_core::widget::tree::State::None, offset)
-                });
+                        (card, cosmic::iced_core::widget::tree::State::None, offset)
+                    });
 
-            col = col.push(reorder_list);
+                col = col.push(reorder_list);
+            }
         }
 
         col.into()

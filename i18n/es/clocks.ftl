@@ -109,6 +109,10 @@ snooze-duration = Duración de posposición
 ring-duration = Duración del timbre
 new-alarm = Nueva alarma
 edit-alarm = Editar alarma
+create-alarm = Crear alarma
+alarm-toast-hours-minutes = Alarma en { $hours }h { $minutes }m
+alarm-toast-minutes = Alarma en { $minutes }m
+alarm-toast-less-than-minute = Alarma en menos de un minuto
 
 # AM/PM labels
 am = a.m.
@@ -174,30 +178,38 @@ shortcuts-reset = Reiniciar
 shortcuts-new-item = Nuevo elemento
 shortcuts-skip-break = Saltar descanso (Pomodoro)
 
+# Settings — world clocks section
+settings-section-world-clocks = Relojes mundiales
+settings-auto-sort-world-clocks = Ordenar automáticamente por diferencia horaria
+
+# Settings — alarms section
+settings-section-alarms = Alarmas
+settings-auto-sort-alarms = Ordenar alarmas automáticamente por hora
+
 # Settings — confirmation dialogs section
-settings-section-confirmation-dialogs = Confirmation dialogs
-settings-confirm-delete-alarm = Confirm before deleting an alarm
-settings-confirm-delete-timer = Confirm before deleting a timer
-settings-confirm-delete-world-clock = Confirm before deleting a world clock
-settings-confirm-delete-pomodoro = Confirm before deleting a pomodoro
-settings-confirm-clear-stopwatch = Confirm before clearing stopwatch history
+settings-section-confirmation-dialogs = Diálogos de confirmación
+settings-confirm-delete-alarm = Confirmar antes de eliminar una alarma
+settings-confirm-delete-timer = Confirmar antes de eliminar un temporizador
+settings-confirm-delete-world-clock = Confirmar antes de eliminar un reloj mundial
+settings-confirm-delete-pomodoro = Confirmar antes de eliminar un pomodoro
+settings-confirm-clear-stopwatch = Confirmar antes de borrar el historial del cronómetro
 
 # Confirmation dialog — titles
-confirm-delete-alarm-title = Delete alarm?
-confirm-delete-timer-title = Delete timer?
-confirm-delete-world-clock-title = Delete world clock?
-confirm-delete-pomodoro-title = Delete pomodoro?
-confirm-clear-stopwatch-title = Clear history?
+confirm-delete-alarm-title = ¿Eliminar alarma?
+confirm-delete-timer-title = ¿Eliminar temporizador?
+confirm-delete-world-clock-title = ¿Eliminar reloj mundial?
+confirm-delete-pomodoro-title = ¿Eliminar pomodoro?
+confirm-clear-stopwatch-title = ¿Borrar historial?
 
 # Confirmation dialog — body
-confirm-delete-alarm-body = This alarm will be permanently removed.
-confirm-delete-timer-body = This timer will be permanently removed.
-confirm-delete-world-clock-body = This world clock will be permanently removed.
-confirm-delete-pomodoro-body = This pomodoro will be permanently removed.
-confirm-clear-stopwatch-body = All lap and session history will be permanently cleared.
+confirm-delete-alarm-body = Esta alarma se eliminará permanentemente.
+confirm-delete-timer-body = Este temporizador se eliminará permanentemente.
+confirm-delete-world-clock-body = Este reloj mundial se eliminará permanentemente.
+confirm-delete-pomodoro-body = Este pomodoro se eliminará permanentemente.
+confirm-clear-stopwatch-body = Todo el historial de vueltas y sesiones se borrará permanentemente.
 
 # Confirmation dialog — shared
-confirm-dont-show-again = Don't show again
-confirm-button-cancel = Cancel
-confirm-button-delete = Delete
-confirm-button-clear = Clear
+confirm-dont-show-again = No volver a mostrar
+confirm-button-cancel = Cancelar
+confirm-button-delete = Eliminar
+confirm-button-clear = Borrar

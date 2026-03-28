@@ -9,9 +9,9 @@ use crate::audio;
 use crate::fl;
 use crate::pages::{Page, alarm, pomodoro, stopwatch, timer};
 use cosmic::cosmic_config::CosmicConfigEntry;
-use chrono::{Datelike, Local, Timelike};
+use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Timelike, Utc};
 use cosmic::prelude::*;
-use cosmic::widget;
+use cosmic::widget::{self, toaster};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -75,7 +75,49 @@ impl AppModel {
         }
     }
 
-    pub(super) fn save_state(&self) {
+    /// Sort alarms by time (hour, minute).
+    pub(super) fn sort_alarms(&mut self) {
+        self.alarm
+            .alarms
+            .sort_by(|a, b| (a.hour, a.minute).cmp(&(b.hour, b.minute)));
+    }
+
+    /// Sort world clocks by UTC offset so that:
+    /// - clocks behind (west) come first (most negative offset),
+    /// - the local timezone sits in the middle,
+    /// - clocks ahead (east) come last (most positive offset).
+    pub(super) fn sort_world_clocks(&mut self) {
+        let now_utc = Utc::now();
+        let local_tz = self.world_clocks.local_timezone;
+        let local_offset = local_tz
+            .offset_from_utc_datetime(&now_utc.naive_utc())
+            .fix()
+            .local_minus_utc();
+
+        self.world_clocks.clocks.sort_by(|a, b| {
+            let off_a = a
+                .timezone
+                .offset_from_utc_datetime(&now_utc.naive_utc())
+                .fix()
+                .local_minus_utc()
+                - local_offset;
+            let off_b = b
+                .timezone
+                .offset_from_utc_datetime(&now_utc.naive_utc())
+                .fix()
+                .local_minus_utc()
+                - local_offset;
+            off_a.cmp(&off_b)
+        });
+    }
+
+    pub(super) fn save_state(&mut self) {
+        if self.auto_sort_alarms {
+            self.sort_alarms();
+        }
+        if self.auto_sort_world_clocks {
+            self.sort_world_clocks();
+        }
         let Some(ctx) = &self.config_context else {
             return;
         };
@@ -90,6 +132,8 @@ impl AppModel {
             self.confirm_delete_world_clock,
             self.confirm_delete_pomodoro,
             self.confirm_clear_stopwatch,
+            self.auto_sort_alarms,
+            self.auto_sort_world_clocks,
         );
         if let Err(e) = config.write_entry(ctx) {
             eprintln!("Failed to save config: {:?}", e);
@@ -264,6 +308,83 @@ impl AppModel {
             }
         }
         Task::none()
+    }
+
+    /// Push a toast showing how long until the given alarm fires.
+    pub(super) fn push_alarm_toast(&mut self, alarm: &alarm::AlarmEntry) -> Task<cosmic::Action<Message>> {
+        let now = Local::now();
+        let alarm_time = NaiveTime::from_hms_opt(alarm.hour as u32, alarm.minute as u32, 0)
+            .unwrap_or_default();
+        let now_time = now.time();
+
+        // Compute minutes until next occurrence
+        let total_minutes = if alarm_time > now_time {
+            // Later today
+            let diff = alarm_time - now_time;
+            diff.num_minutes()
+        } else {
+            // Tomorrow (or next scheduled day)
+            let diff = alarm_time - now_time;
+            diff.num_minutes() + 24 * 60
+        };
+
+        // Account for day-of-week scheduling
+        let total_minutes = match &alarm.repeat_mode {
+            alarm::RepeatMode::Custom(days) if !days.is_empty() => {
+                let today = alarm::DayOfWeek::from_chrono(now.weekday());
+                let today_works = days.contains(&today) && alarm_time > now_time;
+
+                if today_works {
+                    let diff = alarm_time - now_time;
+                    diff.num_minutes()
+                } else {
+                    // Find next matching day
+                    let weekdays: Vec<chrono::Weekday> = days
+                        .iter()
+                        .map(|d| match d {
+                            alarm::DayOfWeek::Monday => chrono::Weekday::Mon,
+                            alarm::DayOfWeek::Tuesday => chrono::Weekday::Tue,
+                            alarm::DayOfWeek::Wednesday => chrono::Weekday::Wed,
+                            alarm::DayOfWeek::Thursday => chrono::Weekday::Thu,
+                            alarm::DayOfWeek::Friday => chrono::Weekday::Fri,
+                            alarm::DayOfWeek::Saturday => chrono::Weekday::Sat,
+                            alarm::DayOfWeek::Sunday => chrono::Weekday::Sun,
+                        })
+                        .collect();
+
+                    let current_wd = now.weekday();
+                    let mut min_days_ahead = 8u32;
+                    for wd in &weekdays {
+                        let diff = (*wd as i32 - current_wd as i32).rem_euclid(7) as u32;
+                        let days_ahead = if diff == 0 { 7 } else { diff };
+                        if days_ahead < min_days_ahead {
+                            min_days_ahead = days_ahead;
+                        }
+                    }
+
+                    // Minutes from now to that day at alarm_time
+                    let base_diff = alarm_time - now_time;
+                    base_diff.num_minutes() + (min_days_ahead as i64) * 24 * 60
+                }
+            }
+            _ => total_minutes,
+        };
+
+        let message = if total_minutes <= 0 {
+            fl!("alarm-toast-less-than-minute")
+        } else if total_minutes < 60 {
+            fl!("alarm-toast-minutes", minutes = total_minutes.to_string())
+        } else {
+            let hours = total_minutes / 60;
+            let mins = total_minutes % 60;
+            fl!(
+                "alarm-toast-hours-minutes",
+                hours = hours.to_string(),
+                minutes = mins.to_string()
+            )
+        };
+
+        self.toasts.push(toaster::Toast::new(message)).map(cosmic::action::app)
     }
 
     pub(super) fn update_title(&mut self) -> Task<cosmic::Action<Message>> {

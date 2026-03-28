@@ -109,6 +109,10 @@ snooze-duration = Doba odložení
 ring-duration = Doba zvonění
 new-alarm = Nový budík
 edit-alarm = Upravit budík
+create-alarm = Vytvořit budík
+alarm-toast-hours-minutes = Budík za { $hours }hod. { $minutes }min
+alarm-toast-minutes = Budík za { $minutes }min
+alarm-toast-less-than-minute = Budík za méně než minutu
 
 # AM/PM labels
 am = AM
@@ -174,30 +178,38 @@ shortcuts-reset = Resetovat
 shortcuts-new-item = Nová položka
 shortcuts-skip-break = Přeskočit pauzu (Pomodoro)
 
+# Settings — world clocks section
+settings-section-world-clocks = Světové hodiny
+settings-auto-sort-world-clocks = Automaticky řadit podle časového posunu
+
+# Settings — alarms section
+settings-section-alarms = Budíky
+settings-auto-sort-alarms = Automaticky řadit budíky podle času
+
 # Settings — confirmation dialogs section
-settings-section-confirmation-dialogs = Confirmation dialogs
-settings-confirm-delete-alarm = Confirm before deleting an alarm
-settings-confirm-delete-timer = Confirm before deleting a timer
-settings-confirm-delete-world-clock = Confirm before deleting a world clock
-settings-confirm-delete-pomodoro = Confirm before deleting a pomodoro
-settings-confirm-clear-stopwatch = Confirm before clearing stopwatch history
+settings-section-confirmation-dialogs = Potvrzovací dialogy
+settings-confirm-delete-alarm = Potvrdit před smazáním budíku
+settings-confirm-delete-timer = Potvrdit před smazáním časovače
+settings-confirm-delete-world-clock = Potvrdit před smazáním světových hodin
+settings-confirm-delete-pomodoro = Potvrdit před smazáním pomodora
+settings-confirm-clear-stopwatch = Potvrdit před vymazáním historie stopek
 
 # Confirmation dialog — titles
-confirm-delete-alarm-title = Delete alarm?
-confirm-delete-timer-title = Delete timer?
-confirm-delete-world-clock-title = Delete world clock?
-confirm-delete-pomodoro-title = Delete pomodoro?
-confirm-clear-stopwatch-title = Clear history?
+confirm-delete-alarm-title = Smazat budík?
+confirm-delete-timer-title = Smazat časovač?
+confirm-delete-world-clock-title = Smazat světové hodiny?
+confirm-delete-pomodoro-title = Smazat pomodoro?
+confirm-clear-stopwatch-title = Vymazat historii?
 
 # Confirmation dialog — body
-confirm-delete-alarm-body = This alarm will be permanently removed.
-confirm-delete-timer-body = This timer will be permanently removed.
-confirm-delete-world-clock-body = This world clock will be permanently removed.
-confirm-delete-pomodoro-body = This pomodoro will be permanently removed.
-confirm-clear-stopwatch-body = All lap and session history will be permanently cleared.
+confirm-delete-alarm-body = Tento budík bude trvale odstraněn.
+confirm-delete-timer-body = Tento časovač bude trvale odstraněn.
+confirm-delete-world-clock-body = Tyto světové hodiny budou trvale odstraněny.
+confirm-delete-pomodoro-body = Toto pomodoro bude trvale odstraněno.
+confirm-clear-stopwatch-body = Celá historie kol a relací bude trvale vymazána.
 
 # Confirmation dialog — shared
-confirm-dont-show-again = Don't show again
-confirm-button-cancel = Cancel
-confirm-button-delete = Delete
-confirm-button-clear = Clear
+confirm-dont-show-again = Příště nezobrazovat
+confirm-button-cancel = Zrušit
+confirm-button-delete = Smazat
+confirm-button-clear = Vymazat

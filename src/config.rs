@@ -30,6 +30,12 @@ pub struct Config {
     pub confirm_delete_pomodoro: bool,
     #[serde(default = "default_true")]
     pub confirm_clear_stopwatch: bool,
+    /// Automatically sort alarms by time of activation
+    #[serde(default)]
+    pub auto_sort_alarms: bool,
+    /// Automatically sort world clocks by timezone offset
+    #[serde(default)]
+    pub auto_sort_world_clocks: bool,
 }
 
 fn default_true() -> bool {
@@ -50,6 +56,8 @@ impl Default for Config {
             confirm_delete_world_clock: true,
             confirm_delete_pomodoro: true,
             confirm_clear_stopwatch: true,
+            auto_sort_alarms: false,
+            auto_sort_world_clocks: false,
         }
     }
 }

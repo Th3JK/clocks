@@ -144,6 +144,11 @@ pub struct AlarmState {
     pub last_triggered_minute: Option<(u8, u8)>,
     pub ringing: Vec<RingingAlarm>,
     pub snoozed: Vec<SnoozedAlarm>,
+    pub edit_mode: bool,
+    /// Index of the item currently being dragged (in edit mode).
+    pub dragging_index: Option<usize>,
+    /// Snapshot of alarm IDs before drag started, for cancel/revert.
+    pub pre_drag_order: Vec<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -168,6 +173,9 @@ impl Default for AlarmState {
             last_triggered_minute: None,
             ringing: Vec::new(),
             snoozed: Vec::new(),
+            edit_mode: false,
+            dragging_index: None,
+            pre_drag_order: Vec::new(),
         }
     }
 }

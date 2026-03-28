@@ -34,6 +34,22 @@ impl AppModel {
         col = col.push(row);
 
         col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-world-clocks")));
+        col = col.push(
+            widget::checkbox(self.auto_sort_world_clocks)
+                .label(fl!("settings-auto-sort-world-clocks"))
+                .on_toggle(Message::SetAutoSortWorldClocks),
+        );
+
+        col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-alarms")));
+        col = col.push(
+            widget::checkbox(self.auto_sort_alarms)
+                .label(fl!("settings-auto-sort-alarms"))
+                .on_toggle(Message::SetAutoSortAlarms),
+        );
+
+        col = col.push(widget::divider::horizontal::default());
         col = col.push(widget::text::title4(fl!("settings-section-confirmation-dialogs")));
 
         col = col.push(

@@ -29,4 +29,9 @@ pub enum Message {
     ToggleAmPm(bool),
     SnoozeAlarm(u32),
     DismissAlarm(u32),
+    ToggleEditMode,
+    StartDrag(usize),
+    Reorder(usize, usize),
+    FinishDrag,
+    CancelDrag,
 }

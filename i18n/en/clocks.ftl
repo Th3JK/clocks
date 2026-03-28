@@ -109,6 +109,10 @@ snooze-duration = Snooze Duration
 ring-duration = Ring Duration
 new-alarm = New Alarm
 edit-alarm = Edit Alarm
+create-alarm = Create alarm
+alarm-toast-hours-minutes = Alarm in { $hours }h { $minutes }m
+alarm-toast-minutes = Alarm in { $minutes }m
+alarm-toast-less-than-minute = Alarm in less than a minute
 
 # AM/PM labels
 am = AM
@@ -173,6 +177,14 @@ shortcuts-lap = Lap (Stopwatch)
 shortcuts-reset = Reset
 shortcuts-new-item = New item
 shortcuts-skip-break = Skip break (Pomodoro)
+
+# Settings — world clocks section
+settings-section-world-clocks = World Clocks
+settings-auto-sort-world-clocks = Automatically sort by timezone offset
+
+# Settings — alarms section
+settings-section-alarms = Alarms
+settings-auto-sort-alarms = Automatically sort alarms by time
 
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Confirmation dialogs

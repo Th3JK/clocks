@@ -202,6 +202,41 @@ impl AlarmState {
                     }
                 }
             }
+            Message::ToggleEditMode => {
+                self.edit_mode = !self.edit_mode;
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::StartDrag(index) => {
+                self.pre_drag_order = self.alarms.iter().map(|a| a.id).collect();
+                self.dragging_index = Some(index);
+            }
+            Message::Reorder(from, to) => {
+                if from < self.alarms.len() && to < self.alarms.len() && from != to {
+                    let alarm = self.alarms.remove(from);
+                    self.alarms.insert(to, alarm);
+                    self.dragging_index = Some(to);
+                }
+            }
+            Message::FinishDrag => {
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::CancelDrag => {
+                if !self.pre_drag_order.is_empty() {
+                    let id_order = &self.pre_drag_order;
+                    let mut restored = Vec::with_capacity(id_order.len());
+                    for &id in id_order {
+                        if let Some(pos) = self.alarms.iter().position(|a| a.id == id) {
+                            restored.push(self.alarms.remove(pos));
+                        }
+                    }
+                    restored.append(&mut self.alarms);
+                    self.alarms = restored;
+                }
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
             Message::SnoozeAlarm(alarm_id) => {
                 if let Some(pos) = self.ringing.iter().position(|r| r.alarm_id == alarm_id) {
                     let ringing = self.ringing.remove(pos);

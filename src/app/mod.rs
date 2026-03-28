@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::pages::ContextPage;
 use crate::pages::{alarm, pomodoro, stopwatch, timer, world_clocks};
 use cosmic::cosmic_config;
-use cosmic::widget::{about::About, menu, nav_bar};
+use cosmic::widget::{about::About, menu, nav_bar, toaster};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -61,6 +61,8 @@ pub struct AppModel {
     confirm_delete_world_clock: bool,
     confirm_delete_pomodoro: bool,
     confirm_clear_stopwatch: bool,
+    auto_sort_alarms: bool,
+    auto_sort_world_clocks: bool,
 
     // Page states (each page owns its own MVU model)
     world_clocks: world_clocks::WorldClocksState,
@@ -75,6 +77,9 @@ pub struct AppModel {
 
     // Audio stop handles for ringing alarms
     alarm_audio_stops: HashMap<u32, Arc<AtomicBool>>,
+
+    // Toast notifications
+    toasts: toaster::Toasts<Message>,
 }
 
 // --- Messages ---
@@ -109,6 +114,11 @@ pub enum Message {
     CancelDestructiveAction,
     ToggleConfirmDontShowAgain(bool),
     ToggleConfirmationSetting(ConfirmationCategory, bool),
+    // Toast notifications
+    CloseToast(toaster::ToastId),
+    // Auto-sorting
+    SetAutoSortAlarms(bool),
+    SetAutoSortWorldClocks(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

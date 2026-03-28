@@ -109,6 +109,10 @@ snooze-duration = Длительность отложения
 ring-duration = Длительность звонка
 new-alarm = Новый будильник
 edit-alarm = Редактировать будильник
+create-alarm = Создать будильник
+alarm-toast-hours-minutes = Будильник через { $hours }ч { $minutes }мин
+alarm-toast-minutes = Будильник через { $minutes }мин
+alarm-toast-less-than-minute = Будильник менее чем через минуту
 
 # AM/PM labels
 am = AM
@@ -174,30 +178,38 @@ shortcuts-reset = Сброс
 shortcuts-new-item = Новый элемент
 shortcuts-skip-break = Пропустить перерыв (Помодоро)
 
+# Settings — world clocks section
+settings-section-world-clocks = Мировые часы
+settings-auto-sort-world-clocks = Автоматически сортировать по смещению часового пояса
+
+# Settings — alarms section
+settings-section-alarms = Будильники
+settings-auto-sort-alarms = Автоматически сортировать будильники по времени
+
 # Settings — confirmation dialogs section
-settings-section-confirmation-dialogs = Confirmation dialogs
-settings-confirm-delete-alarm = Confirm before deleting an alarm
-settings-confirm-delete-timer = Confirm before deleting a timer
-settings-confirm-delete-world-clock = Confirm before deleting a world clock
-settings-confirm-delete-pomodoro = Confirm before deleting a pomodoro
-settings-confirm-clear-stopwatch = Confirm before clearing stopwatch history
+settings-section-confirmation-dialogs = Диалоги подтверждения
+settings-confirm-delete-alarm = Подтверждать перед удалением будильника
+settings-confirm-delete-timer = Подтверждать перед удалением таймера
+settings-confirm-delete-world-clock = Подтверждать перед удалением мировых часов
+settings-confirm-delete-pomodoro = Подтверждать перед удалением помодоро
+settings-confirm-clear-stopwatch = Подтверждать перед очисткой истории секундомера
 
 # Confirmation dialog — titles
-confirm-delete-alarm-title = Delete alarm?
-confirm-delete-timer-title = Delete timer?
-confirm-delete-world-clock-title = Delete world clock?
-confirm-delete-pomodoro-title = Delete pomodoro?
-confirm-clear-stopwatch-title = Clear history?
+confirm-delete-alarm-title = Удалить будильник?
+confirm-delete-timer-title = Удалить таймер?
+confirm-delete-world-clock-title = Удалить мировые часы?
+confirm-delete-pomodoro-title = Удалить помодоро?
+confirm-clear-stopwatch-title = Очистить историю?
 
 # Confirmation dialog — body
-confirm-delete-alarm-body = This alarm will be permanently removed.
-confirm-delete-timer-body = This timer will be permanently removed.
-confirm-delete-world-clock-body = This world clock will be permanently removed.
-confirm-delete-pomodoro-body = This pomodoro will be permanently removed.
-confirm-clear-stopwatch-body = All lap and session history will be permanently cleared.
+confirm-delete-alarm-body = Этот будильник будет удалён без возможности восстановления.
+confirm-delete-timer-body = Этот таймер будет удалён без возможности восстановления.
+confirm-delete-world-clock-body = Эти мировые часы будут удалены без возможности восстановления.
+confirm-delete-pomodoro-body = Это помодоро будет удалено без возможности восстановления.
+confirm-clear-stopwatch-body = Вся история кругов и сессий будет безвозвратно удалена.
 
 # Confirmation dialog — shared
-confirm-dont-show-again = Don't show again
-confirm-button-cancel = Cancel
-confirm-button-delete = Delete
-confirm-button-clear = Clear
+confirm-dont-show-again = Больше не показывать
+confirm-button-cancel = Отмена
+confirm-button-delete = Удалить
+confirm-button-clear = Очистить
