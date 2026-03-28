@@ -142,6 +142,9 @@ pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocks
         search_text: String::new(),
         filtered_timezones: Vec::new(),
         selected_clock_id: None,
+        edit_mode: false,
+        dragging_index: None,
+        pre_drag_order: Vec::new(),
     }
 }
 

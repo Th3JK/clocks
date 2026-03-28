@@ -5,6 +5,7 @@
 use super::coords::approximate_coords;
 use super::model::*;
 use super::{Message, tz_city_name, tz_region_name};
+use crate::components::reorder_list::ReorderList;
 use crate::fl;
 use chrono::{Datelike, NaiveDate, Offset, TimeZone, Timelike, Utc};
 use cosmic::iced::{Alignment, Color, Length};
@@ -69,57 +70,31 @@ impl WorldClocksState {
             return self.detail_view(clock, use_12h);
         }
 
-        self.list_view(use_12h)
+        if self.edit_mode {
+            self.edit_mode_view(use_12h)
+        } else {
+            self.list_view(use_12h)
+        }
     }
 
-    /// List view: page header + clock list or empty state.
+    /// List view (base/view mode): page header + clock list or empty state.
+    /// Rows have no delete icon, no hover highlight, a right-facing chevron,
+    /// and the entire row is a full-width clickable area.
     fn list_view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = 12;
         let now_utc = Utc::now();
 
         let mut col = widget::column::with_capacity(self.clocks.len() + 3).spacing(spacing);
 
-        // Page header
-        let header = widget::row::with_capacity(2)
-            .align_y(Alignment::Center)
-            .push(widget::text::title3(fl!("world-clocks-title")).width(Length::Fill))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-                    .tooltip(fl!("tooltip-add"))
-                    .on_press(Message::OpenAddSidebar),
-            );
+        // Page header: title + edit button + add button
+        let header = self.header_row();
         col = col.push(header);
 
         if self.clocks.is_empty() {
-            // --- Empty state: centered globe icon + CTA button ---
-            let icon = widget::icon::from_name("preferences-system-time-symbolic")
-                .size(128)
-                .icon()
-                .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
-                        color: Some(theme.cosmic().palette.neutral_5.into()),
-                    },
-                )));
-
-            let empty_state = widget::column::with_capacity(2)
-                .spacing(16)
-                .align_x(Alignment::Center)
-                .push(icon)
-                .push(
-                    widget::button::suggested(fl!("world-clocks-add-button"))
-                        .on_press(Message::OpenAddSidebar),
-                );
-
-            col = col.push(
-                widget::container(empty_state)
-                    .align_x(Alignment::Center)
-                    .align_y(Alignment::Center)
-                    .width(Length::Fill)
-                    .height(Length::Fill),
-            );
+            col = col.push(self.empty_state());
         } else {
             // --- Clock list grouped in a list_column container ---
-            let mut list = widget::list_column();
+            let mut list_col = widget::list_column();
 
             for clock in &self.clocks {
                 let time_in_tz = now_utc.with_timezone(&clock.timezone);
@@ -162,37 +137,331 @@ impl WorldClocksState {
                         }))
                         .padding([6, 14]);
 
-                // Clickable area: left + time pill
-                let clickable = widget::row::with_capacity(2)
+                // Chevron icon on far right
+                let chevron = widget::icon::from_name("go-next-symbolic")
+                    .size(16)
+                    .icon();
+
+                // Full-width clickable row: left + time pill + chevron
+                let clickable = widget::row::with_capacity(3)
                     .spacing(spacing)
                     .align_y(Alignment::Center)
                     .push(left)
-                    .push(time_pill);
+                    .push(time_pill)
+                    .push(chevron);
 
-                let row_btn = widget::button::custom(clickable)
-                    .width(Length::Fill)
-                    .on_press(Message::SelectClock(id))
-                    .class(cosmic::theme::Button::ListItem);
+                // Use mouse_area for full-width click without hover highlight
+                let row = widget::mouse_area(
+                    widget::container(clickable)
+                        .width(Length::Fill)
+                        .padding([8, 0]),
+                )
+                .on_press(Message::SelectClock(id));
 
-                // Delete button sits outside the ListItem button
-                let delete_btn =
-                    widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
-                        .tooltip(fl!("tooltip-remove"))
-                        .on_press(Message::RemoveClock(id));
-
-                let row = widget::row::with_capacity(2)
-                    .spacing(spacing)
-                    .align_y(Alignment::Center)
-                    .push(row_btn)
-                    .push(delete_btn);
-
-                list = list.add(row);
+                list_col = list_col.add(row);
             }
 
-            col = col.push(list);
+            col = col.push(list_col);
         }
 
         col.into()
+    }
+
+    /// Edit mode view: drag handles, card rows, delete buttons.
+    ///
+    /// Follows the cosmic-settings panel applet list pattern:
+    /// each row is an inline card built with standard cosmic primitives,
+    /// wrapped in a `ReorderList` widget for drag-to-reorder via Wayland DnD.
+    fn edit_mode_view(&self, use_12h: bool) -> Element<'_, Message> {
+        let cosmic::cosmic_theme::Spacing {
+            space_xxxs,
+            space_xxs,
+            space_xs,
+            ..
+        } = cosmic::theme::spacing();
+        let now_utc = Utc::now();
+
+        let mut col = widget::column::with_capacity(self.clocks.len() + 3).spacing(space_xxs);
+
+        let header = self.header_row();
+        col = col.push(header);
+
+        if self.clocks.is_empty() {
+            col = col.push(self.empty_state());
+        } else {
+            let dragging = self.dragging_index;
+
+            let card_rows: Vec<Element<'_, Message>> = self
+                .clocks
+                .iter()
+                .enumerate()
+                .map(|(i, clock)| {
+                    // Collapse the dragged item to an accent-colored drop indicator line
+                    if dragging == Some(i) {
+                        return widget::container(widget::Space::new().width(Length::Fill))
+                            .height(Length::Fixed(4.0))
+                            .width(Length::Fill)
+                            .class(cosmic::theme::Container::Custom(Box::new(
+                                |theme| {
+                                    let accent = Color::from(theme.cosmic().accent_color());
+                                    cosmic::iced_widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Background::Color(accent),
+                                        ),
+                                        border: cosmic::iced::Border {
+                                            radius: 2.0.into(),
+                                            ..Default::default()
+                                        },
+                                        ..Default::default()
+                                    }
+                                },
+                            )))
+                            .into();
+                    }
+
+                    let time_in_tz = now_utc.with_timezone(&clock.timezone);
+                    let time_str = if use_12h {
+                        time_in_tz.format("%I:%M %p").to_string()
+                    } else {
+                        time_in_tz.format("%H:%M").to_string()
+                    };
+
+                    let offset_str = self.offset_description(clock.timezone);
+                    let id = clock.id;
+
+                    // Day/night time pill — same as view mode
+                    let local_hour = time_in_tz.hour();
+                    let pill_bg = if (6..20).contains(&local_hour) {
+                        DAY_PILL_COLOR
+                    } else {
+                        NIGHT_PILL_COLOR
+                    };
+                    let time_pill = widget::container(
+                        widget::text::title4(time_str).font(cosmic::font::bold()),
+                    )
+                    .class(cosmic::theme::Container::custom(move |_theme| {
+                        cosmic::iced_widget::container::Style {
+                            background: Some(cosmic::iced::Background::Color(pill_bg)),
+                            border: cosmic::iced::Border {
+                                radius: 8.0.into(),
+                                ..Default::default()
+                            },
+                            text_color: Some(Color::WHITE),
+                            ..Default::default()
+                        }
+                    }))
+                    .padding([6, 14]);
+
+                    // Row content: drag handle | icon | text block | time pill | delete button
+                    let content = widget::row::with_children(vec![
+                        // Drag handle
+                        widget::icon::from_name("grip-lines-symbolic")
+                            .size(16)
+                            .icon()
+                            .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                    color: Some(theme.cosmic().palette.neutral_7.into()),
+                                },
+                            )))
+                            .into(),
+                        // Clock icon
+                        widget::icon::from_name("preferences-system-time-symbolic")
+                            .size(20)
+                            .icon()
+                            .into(),
+                        // Text block: city name (primary) + offset (secondary)
+                        widget::column::with_capacity(2)
+                            .spacing(space_xxxs)
+                            .width(Length::Fill)
+                            .push(widget::text::body(&clock.city_name))
+                            .push(widget::text::caption(offset_str))
+                            .into(),
+                        // Time pill
+                        time_pill.into(),
+                        // Delete button
+                        widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                            .extra_small()
+                            .tooltip(fl!("tooltip-remove"))
+                            .on_press(Message::RemoveClock(id))
+                            .into(),
+                    ])
+                    .spacing(space_xs)
+                    .align_y(Alignment::Center);
+
+                    // Card container: bg_component_color background, radius_s corners,
+                    // accent border when this is the item being dragged elsewhere
+                    widget::container(content)
+                        .padding(8)
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(
+                            move |theme| {
+                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                    theme,
+                                    &cosmic::theme::Container::Primary,
+                                );
+                                style.border.radius = theme.cosmic().radius_s().into();
+                                style.background = Some(
+                                    Color::from(theme.cosmic().bg_component_color()).into(),
+                                );
+                                style
+                            },
+                        )))
+                        .into()
+                })
+                .collect();
+
+            let item_count = self.clocks.len();
+            let cards = widget::column::with_children(card_rows).spacing(space_xxs);
+
+            // Pre-clone clock data for the drag icon builder ('static closure)
+            let clocks_snapshot: Vec<(String, String, Color)> = self
+                .clocks
+                .iter()
+                .map(|clock| {
+                    let time_in_tz = now_utc.with_timezone(&clock.timezone);
+                    let time_str = if use_12h {
+                        time_in_tz.format("%I:%M %p").to_string()
+                    } else {
+                        time_in_tz.format("%H:%M").to_string()
+                    };
+                    let local_hour = time_in_tz.hour();
+                    let pill_bg = if (6..20).contains(&local_hour) {
+                        DAY_PILL_COLOR
+                    } else {
+                        NIGHT_PILL_COLOR
+                    };
+                    (clock.city_name.clone(), time_str, pill_bg)
+                })
+                .collect();
+
+            let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
+                .on_start_drag(Message::StartDrag)
+                .on_reorder(|from, to| Message::Reorder(from, to))
+                .on_finish(Message::FinishDrag)
+                .on_cancel(Message::CancelDrag)
+                .drag_icon(move |index, offset| {
+                    let (city, time_str, pill_bg) = clocks_snapshot
+                        .get(index)
+                        .cloned()
+                        .unwrap_or_else(|| ("Clock".to_string(), String::new(), DAY_PILL_COLOR));
+
+                    let time_pill = widget::container(
+                        widget::text::title4(time_str).font(cosmic::font::bold()),
+                    )
+                    .class(cosmic::theme::Container::custom(move |_theme| {
+                        cosmic::iced_widget::container::Style {
+                            background: Some(cosmic::iced::Background::Color(pill_bg)),
+                            border: cosmic::iced::Border {
+                                radius: 8.0.into(),
+                                ..Default::default()
+                            },
+                            text_color: Some(Color::WHITE),
+                            ..Default::default()
+                        }
+                    }))
+                    .padding([6, 14]);
+
+                    let content = widget::row::with_children(vec![
+                        widget::icon::from_name("grip-lines-symbolic")
+                            .size(16)
+                            .icon()
+                            .into(),
+                        widget::icon::from_name("preferences-system-time-symbolic")
+                            .size(20)
+                            .icon()
+                            .into(),
+                        widget::text::body(city).width(Length::Fill).into(),
+                        time_pill.into(),
+                    ])
+                    .spacing(space_xs)
+                    .align_y(Alignment::Center);
+
+                    // Card with accent border for the floating drag icon
+                    let card: Element<'static, ()> = widget::container(content)
+                        .padding(8)
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(
+                            |theme| {
+                                let accent = Color::from(theme.cosmic().accent_color());
+                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                    theme,
+                                    &cosmic::theme::Container::Primary,
+                                );
+                                style.border.radius = theme.cosmic().radius_s().into();
+                                style.border.color = accent;
+                                style.border.width = 2.0;
+                                style.background = Some(
+                                    Color::from(theme.cosmic().bg_component_color()).into(),
+                                );
+                                style
+                            },
+                        )))
+                        .into();
+
+                    (card, cosmic::iced_core::widget::tree::State::None, offset)
+                });
+
+            col = col.push(reorder_list);
+        }
+
+        col.into()
+    }
+
+    /// Shared header row: title + edit button (if clocks exist) + add button.
+    fn header_row(&self) -> Element<'_, Message> {
+        let mut header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(widget::text::title3(fl!("world-clocks-title")).width(Length::Fill));
+
+        // Only show edit button when there are clocks to edit
+        if !self.clocks.is_empty() {
+            let (edit_icon, edit_tooltip) = if self.edit_mode {
+                ("object-select-symbolic", fl!("tooltip-done-editing"))
+            } else {
+                ("edit-symbolic", fl!("tooltip-edit-mode"))
+            };
+            header = header.push(
+                widget::button::icon(widget::icon::from_name(edit_icon))
+                    .tooltip(edit_tooltip)
+                    .on_press(Message::ToggleEditMode),
+            );
+        }
+
+        header = header.push(
+            widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                .tooltip(fl!("tooltip-add"))
+                .on_press(Message::OpenAddSidebar),
+        );
+
+        header.into()
+    }
+
+    /// Shared empty state: centered globe icon + CTA button.
+    fn empty_state(&self) -> Element<'_, Message> {
+        let icon = widget::icon::from_name("preferences-system-time-symbolic")
+            .size(128)
+            .icon()
+            .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                    color: Some(theme.cosmic().palette.neutral_5.into()),
+                },
+            )));
+
+        let empty_state = widget::column::with_capacity(2)
+            .spacing(16)
+            .align_x(Alignment::Center)
+            .push(icon)
+            .push(
+                widget::button::suggested(fl!("world-clocks-add-button"))
+                    .on_press(Message::OpenAddSidebar),
+            );
+
+        widget::container(empty_state)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Center)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 
     /// Detail view for a single selected clock.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
-// World clocks update logic: search, add, remove, and detail navigation.
+// World clocks update logic: search, add, remove, detail navigation,
+// edit mode, and drag-to-reorder.
 
 use super::model::*;
 use super::{tz_city_name, Message};
@@ -41,10 +42,11 @@ impl WorldClocksState {
             }
             Message::RemoveClock(id) => {
                 self.clocks.retain(|c| c.id != id);
-                // If the removed clock was selected, return to list view
                 if self.selected_clock_id == Some(id) {
                     self.selected_clock_id = None;
                 }
+                // If we were dragging, reset drag state since indices changed
+                self.dragging_index = None;
             }
             Message::OpenAddSidebar => {
                 // Handled in app.rs
@@ -54,6 +56,44 @@ impl WorldClocksState {
             }
             Message::DeselectClock => {
                 self.selected_clock_id = None;
+            }
+            Message::ToggleEditMode => {
+                self.edit_mode = !self.edit_mode;
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::StartDrag(index) => {
+                // Save current order for cancel/revert
+                self.pre_drag_order = self.clocks.iter().map(|c| c.id).collect();
+                self.dragging_index = Some(index);
+            }
+            Message::Reorder(from, to) => {
+                if from < self.clocks.len() && to < self.clocks.len() && from != to {
+                    let clock = self.clocks.remove(from);
+                    self.clocks.insert(to, clock);
+                    self.dragging_index = Some(to);
+                }
+            }
+            Message::FinishDrag => {
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::CancelDrag => {
+                // Revert to pre-drag order
+                if !self.pre_drag_order.is_empty() {
+                    let id_order = &self.pre_drag_order;
+                    let mut restored = Vec::with_capacity(id_order.len());
+                    for &id in id_order {
+                        if let Some(pos) = self.clocks.iter().position(|c| c.id == id) {
+                            restored.push(self.clocks.remove(pos));
+                        }
+                    }
+                    // Append any clocks added during drag (shouldn't happen, but be safe)
+                    restored.append(&mut self.clocks);
+                    self.clocks = restored;
+                }
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
             }
         }
     }

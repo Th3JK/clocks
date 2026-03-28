@@ -74,6 +74,8 @@ world-clocks-same-time = Same time
 world-clocks-detail-sunrise = Sunrise
 world-clocks-detail-sunset = Sunset
 world-clocks-no-sun-data = --:--
+tooltip-edit-mode = Edit
+tooltip-done-editing = Done
 
 # Stopwatch
 stopwatch-title = Stopwatch

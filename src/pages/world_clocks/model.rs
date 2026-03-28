@@ -19,6 +19,11 @@ pub struct WorldClocksState {
     pub search_text: String,
     pub filtered_timezones: Vec<(String, Tz)>,
     pub selected_clock_id: Option<u32>,
+    pub edit_mode: bool,
+    /// Index of the item currently being dragged (in edit mode).
+    pub dragging_index: Option<usize>,
+    /// Snapshot of clock IDs before drag started, for cancel/revert.
+    pub pre_drag_order: Vec<u32>,
 }
 
 impl Default for WorldClocksState {
@@ -35,6 +40,9 @@ impl Default for WorldClocksState {
             search_text: String::new(),
             filtered_timezones: Vec::new(),
             selected_clock_id: None,
+            edit_mode: false,
+            dragging_index: None,
+            pre_drag_order: Vec::new(),
         }
     }
 }

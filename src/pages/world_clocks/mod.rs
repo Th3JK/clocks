@@ -17,6 +17,11 @@ pub enum Message {
     OpenAddSidebar,
     SelectClock(u32),
     DeselectClock,
+    ToggleEditMode,
+    StartDrag(usize),
+    Reorder(usize, usize),
+    FinishDrag,
+    CancelDrag,
 }
 
 /// Extract the city name from a timezone identifier (last segment after `/`).
