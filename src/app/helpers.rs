@@ -126,6 +126,7 @@ impl AppModel {
             &self.alarm,
             &self.timer,
             &self.pomodoro,
+            &self.stopwatch,
             self.use_12h,
             self.confirm_delete_alarm,
             self.confirm_delete_timer,
@@ -134,6 +135,7 @@ impl AppModel {
             self.confirm_clear_stopwatch,
             self.auto_sort_alarms,
             self.auto_sort_world_clocks,
+            self.auto_clear_stopwatch_history,
         );
         if let Err(e) = config.write_entry(ctx) {
             eprintln!("Failed to save config: {:?}", e);

@@ -36,6 +36,12 @@ pub struct Config {
     /// Automatically sort world clocks by timezone offset
     #[serde(default)]
     pub auto_sort_world_clocks: bool,
+    /// Automatically clear stopwatch history after session ends
+    #[serde(default)]
+    pub auto_clear_stopwatch_history: bool,
+    /// Saved stopwatch history records
+    #[serde(default)]
+    pub stopwatch_history: Vec<SavedStopwatchRecord>,
 }
 
 fn default_true() -> bool {
@@ -58,6 +64,8 @@ impl Default for Config {
             confirm_clear_stopwatch: true,
             auto_sort_alarms: false,
             auto_sort_world_clocks: false,
+            auto_clear_stopwatch_history: false,
+            stopwatch_history: Vec::new(),
         }
     }
 }
@@ -111,6 +119,19 @@ pub struct PomodoroDefaults {
     pub work_minutes: u32,
     pub short_break_minutes: u32,
     pub long_break_minutes: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedStopwatchRecord {
+    pub label: String,
+    pub total_elapsed_ms: u64,
+    pub laps: Vec<SavedLap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedLap {
+    pub lap_time_ms: u64,
+    pub delta_ms: i64,
 }
 
 impl Default for PomodoroDefaults {

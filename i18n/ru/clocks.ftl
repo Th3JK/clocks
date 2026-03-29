@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Автоматически сортирова�
 settings-section-alarms = Будильники
 settings-auto-sort-alarms = Автоматически сортировать будильники по времени
 
+# Settings — stopwatch section
+settings-section-stopwatch = Секундомер
+settings-auto-clear-stopwatch-history = Автоматически очищать историю после завершения сеанса
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Диалоги подтверждения
 settings-confirm-delete-alarm = Подтверждать перед удалением будильника

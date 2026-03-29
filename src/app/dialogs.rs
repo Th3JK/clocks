@@ -50,6 +50,14 @@ impl AppModel {
         );
 
         col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-stopwatch")));
+        col = col.push(
+            widget::checkbox(self.auto_clear_stopwatch_history)
+                .label(fl!("settings-auto-clear-stopwatch-history"))
+                .on_toggle(Message::SetAutoClearStopwatchHistory),
+        );
+
+        col = col.push(widget::divider::horizontal::default());
         col = col.push(widget::text::title4(fl!("settings-section-confirmation-dialogs")));
 
         col = col.push(

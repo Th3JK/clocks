@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Automatycznie sortuj według przesunięcia str
 settings-section-alarms = Budziki
 settings-auto-sort-alarms = Automatycznie sortuj budziki według czasu
 
+# Settings — stopwatch section
+settings-section-stopwatch = Stoper
+settings-auto-clear-stopwatch-history = Automatycznie wyczyść historię po zakończeniu sesji
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Okna potwierdzenia
 settings-confirm-delete-alarm = Potwierdź przed usunięciem alarmu

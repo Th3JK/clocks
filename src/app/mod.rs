@@ -63,6 +63,7 @@ pub struct AppModel {
     confirm_clear_stopwatch: bool,
     auto_sort_alarms: bool,
     auto_sort_world_clocks: bool,
+    auto_clear_stopwatch_history: bool,
 
     // Page states (each page owns its own MVU model)
     world_clocks: world_clocks::WorldClocksState,
@@ -119,6 +120,7 @@ pub enum Message {
     // Auto-sorting
     SetAutoSortAlarms(bool),
     SetAutoSortWorldClocks(bool),
+    SetAutoClearStopwatchHistory(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

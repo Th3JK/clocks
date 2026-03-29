@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Automaticky řadit podle časového posunu
 settings-section-alarms = Budíky
 settings-auto-sort-alarms = Automaticky řadit budíky podle času
 
+# Settings — stopwatch section
+settings-section-stopwatch = Stopky
+settings-auto-clear-stopwatch-history = Automaticky vymazat historii po ukončení relace
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Potvrzovací dialogy
 settings-confirm-delete-alarm = Potvrdit před smazáním budíku

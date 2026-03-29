@@ -4,9 +4,10 @@
 // and restoring page states from a saved `Config`.
 
 use crate::config::{
-    Config, PomodoroDefaults, SavedAlarm, SavedClock, SavedPomodoro, SavedRepeatMode, SavedTimer,
+    Config, PomodoroDefaults, SavedAlarm, SavedClock, SavedLap, SavedPomodoro, SavedRepeatMode,
+    SavedStopwatchRecord, SavedTimer,
 };
-use crate::pages::{alarm, pomodoro, timer, world_clocks};
+use crate::pages::{alarm, pomodoro, stopwatch, timer, world_clocks};
 use std::time::Duration;
 
 // --- Persistence: build Config from runtime state ---
@@ -17,6 +18,7 @@ pub(super) fn build_config_from_state(
     al: &alarm::AlarmState,
     ti: &timer::TimerState,
     po: &pomodoro::PomodoroState,
+    sw: &stopwatch::StopwatchState,
     use_12h: bool,
     confirm_delete_alarm: bool,
     confirm_delete_timer: bool,
@@ -25,6 +27,7 @@ pub(super) fn build_config_from_state(
     confirm_clear_stopwatch: bool,
     auto_sort_alarms: bool,
     auto_sort_world_clocks: bool,
+    auto_clear_stopwatch_history: bool,
 ) -> Config {
     let world_clocks = wc
         .clocks
@@ -90,6 +93,23 @@ pub(super) fn build_config_from_state(
         long_break_minutes: po.default_long_break_minutes,
     };
 
+    let stopwatch_history = sw
+        .history
+        .iter()
+        .map(|r| SavedStopwatchRecord {
+            label: r.label.clone(),
+            total_elapsed_ms: r.total_elapsed.as_millis() as u64,
+            laps: r
+                .laps
+                .iter()
+                .map(|l| SavedLap {
+                    lap_time_ms: l.lap_time.as_millis() as u64,
+                    delta_ms: l.delta,
+                })
+                .collect(),
+        })
+        .collect();
+
     Config {
         world_clocks,
         alarms,
@@ -104,6 +124,8 @@ pub(super) fn build_config_from_state(
         confirm_clear_stopwatch,
         auto_sort_alarms,
         auto_sort_world_clocks,
+        auto_clear_stopwatch_history,
+        stopwatch_history,
     }
 }
 
@@ -293,4 +315,53 @@ pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     }
 
     state
+}
+
+pub(super) fn restore_stopwatch_history(config: &Config) -> stopwatch::StopwatchState {
+    let history: Vec<stopwatch::StopwatchRecord> = config
+        .stopwatch_history
+        .iter()
+        .enumerate()
+        .map(|(i, r)| stopwatch::StopwatchRecord {
+            id: (i + 1) as u32,
+            label: r.label.clone(),
+            total_elapsed: Duration::from_millis(r.total_elapsed_ms),
+            laps: r
+                .laps
+                .iter()
+                .enumerate()
+                .map(|(j, l)| stopwatch::LapEntry {
+                    id: (j + 1) as u32,
+                    lap_time: Duration::from_millis(l.lap_time_ms),
+                    delta: l.delta_ms,
+                    is_fastest: false,
+                    is_slowest: false,
+                })
+                .collect(),
+        })
+        .collect();
+
+    // Recompute fastest/slowest flags for each record's laps
+    let history: Vec<stopwatch::StopwatchRecord> = history
+        .into_iter()
+        .map(|mut r| {
+            if r.laps.len() >= 2 {
+                let min = r.laps.iter().map(|l| l.lap_time).min().unwrap();
+                let max = r.laps.iter().map(|l| l.lap_time).max().unwrap();
+                for lap in &mut r.laps {
+                    lap.is_fastest = lap.lap_time == min;
+                    lap.is_slowest = lap.lap_time == max;
+                }
+            }
+            r
+        })
+        .collect();
+
+    let next_history_id = history.len() as u32 + 1;
+
+    stopwatch::StopwatchState {
+        history,
+        next_history_id,
+        ..Default::default()
+    }
 }

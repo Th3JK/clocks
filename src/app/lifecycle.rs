@@ -2,7 +2,10 @@
 //
 // Implements the `cosmic::Application` trait for `AppModel`.
 
-use super::persistence::{restore_alarms, restore_pomodoros, restore_timers, restore_world_clocks};
+use super::persistence::{
+    restore_alarms, restore_pomodoros, restore_stopwatch_history, restore_timers,
+    restore_world_clocks,
+};
 use super::subscriptions::{input_subscription, open_sound_file_dialog, tick_subscription};
 use super::{
     AppModel, ConfirmationCategory, CustomSoundTarget, DestructiveAction, MenuAction, Message,
@@ -91,6 +94,7 @@ impl cosmic::Application for AppModel {
         let alarm = restore_alarms(&config);
         let timer = restore_timers(&config);
         let pomodoro = restore_pomodoros(&config);
+        let stopwatch = restore_stopwatch_history(&config);
 
         let use_12h = config.use_12h;
         let confirm_delete_alarm = config.confirm_delete_alarm;
@@ -100,6 +104,7 @@ impl cosmic::Application for AppModel {
         let confirm_clear_stopwatch = config.confirm_clear_stopwatch;
         let auto_sort_alarms = config.auto_sort_alarms;
         let auto_sort_world_clocks = config.auto_sort_world_clocks;
+        let auto_clear_stopwatch_history = config.auto_clear_stopwatch_history;
 
         let mut app = AppModel {
             core,
@@ -120,8 +125,9 @@ impl cosmic::Application for AppModel {
             confirm_clear_stopwatch,
             auto_sort_alarms,
             auto_sort_world_clocks,
+            auto_clear_stopwatch_history,
             world_clocks,
-            stopwatch: stopwatch::StopwatchState::default(),
+            stopwatch,
             alarm,
             timer,
             pomodoro,
@@ -464,13 +470,26 @@ impl cosmic::Application for AppModel {
                         return Task::none();
                     }
                     self.stopwatch.update(msg.clone());
+                    self.save_state();
                 }
                 stopwatch::Message::ResumeFromHistory(_) => {
                     self.stopwatch.update(msg.clone());
                     self.core.window.show_context = false;
+                    self.save_state();
+                }
+                stopwatch::Message::Reset => {
+                    self.stopwatch.update(msg.clone());
+                    if self.auto_clear_stopwatch_history {
+                        self.stopwatch.update(stopwatch::Message::ClearHistory);
+                    }
+                    self.save_state();
+                }
+                stopwatch::Message::Tick => {
+                    self.stopwatch.update(msg.clone());
                 }
                 _ => {
                     self.stopwatch.update(msg.clone());
+                    self.save_state();
                 }
             },
 
@@ -540,6 +559,7 @@ impl cosmic::Application for AppModel {
                 self.confirm_clear_stopwatch = config.confirm_clear_stopwatch;
                 self.auto_sort_alarms = config.auto_sort_alarms;
                 self.auto_sort_world_clocks = config.auto_sort_world_clocks;
+                self.auto_clear_stopwatch_history = config.auto_clear_stopwatch_history;
                 self.config = config;
             }
 
@@ -664,6 +684,7 @@ impl cosmic::Application for AppModel {
                     None => {}
                 }
                 self.confirm_dialog_dont_show_again = false;
+                self.save_state();
             }
 
             Message::CancelDestructiveAction => {
@@ -707,6 +728,10 @@ impl cosmic::Application for AppModel {
                 if enabled {
                     self.sort_world_clocks();
                 }
+            }
+
+            Message::SetAutoClearStopwatchHistory(enabled) => {
+                self.auto_clear_stopwatch_history = enabled;
             }
 
             Message::LaunchUrl(url) => match open::that_detached(&url) {

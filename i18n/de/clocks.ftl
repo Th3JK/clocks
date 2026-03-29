@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Automatisch nach Zeitzonenversatz sortieren
 settings-section-alarms = Wecker
 settings-auto-sort-alarms = Wecker automatisch nach Uhrzeit sortieren
 
+# Settings — stopwatch section
+settings-section-stopwatch = Stoppuhr
+settings-auto-clear-stopwatch-history = Verlauf nach Sitzungsende automatisch löschen
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Bestätigungsdialoge
 settings-confirm-delete-alarm = Vor dem Löschen eines Weckers bestätigen

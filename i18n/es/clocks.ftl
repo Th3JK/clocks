@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Ordenar automáticamente por diferencia horari
 settings-section-alarms = Alarmas
 settings-auto-sort-alarms = Ordenar alarmas automáticamente por hora
 
+# Settings — stopwatch section
+settings-section-stopwatch = Cronómetro
+settings-auto-clear-stopwatch-history = Borrar historial automáticamente al finalizar la sesión
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Diálogos de confirmación
 settings-confirm-delete-alarm = Confirmar antes de eliminar una alarma

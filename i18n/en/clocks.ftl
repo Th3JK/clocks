@@ -186,6 +186,10 @@ settings-auto-sort-world-clocks = Automatically sort by timezone offset
 settings-section-alarms = Alarms
 settings-auto-sort-alarms = Automatically sort alarms by time
 
+# Settings — stopwatch section
+settings-section-stopwatch = Stopwatch
+settings-auto-clear-stopwatch-history = Automatically clear history after session ends
+
 # Settings — confirmation dialogs section
 settings-section-confirmation-dialogs = Confirmation dialogs
 settings-confirm-delete-alarm = Confirm before deleting an alarm
