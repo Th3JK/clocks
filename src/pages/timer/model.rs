@@ -32,6 +32,10 @@ pub struct TimerState {
     pub edit_repeat: bool,
     pub edit_repeat_count: u32,
     pub edit_sound: String,
+    // Edit mode (reorder/delete)
+    pub edit_mode: bool,
+    pub dragging_index: Option<usize>,
+    pub pre_drag_order: Vec<u32>,
 }
 
 impl Default for TimerState {
@@ -48,6 +52,9 @@ impl Default for TimerState {
             edit_repeat: false,
             edit_repeat_count: 1,
             edit_sound: "Bell".to_string(),
+            edit_mode: false,
+            dragging_index: None,
+            pre_drag_order: Vec::new(),
         }
     }
 }

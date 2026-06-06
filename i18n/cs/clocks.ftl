@@ -130,6 +130,7 @@ day-sun = Ne
 # Timer
 timer-title = Časovač
 no-timers = Žádné časovače nejsou nastaveny
+create-timer = Vytvořit časovač
 timer-label-placeholder = Název časovače
 timer-default-label = Časovač { $id }
 repeat-on = Opakování: ZAP

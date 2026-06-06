@@ -130,6 +130,7 @@ day-sun = Nd
 # Timer
 timer-title = Timer
 no-timers = Brak ustawionych timerów
+create-timer = Utwórz timer
 timer-label-placeholder = Etykieta timera
 timer-default-label = Timer { $id }
 repeat-on = Powtarzaj: WŁ

@@ -130,6 +130,7 @@ day-sun = Dom
 # Timer
 timer-title = Temporizador
 no-timers = No hay temporizadores configurados
+create-timer = Crear temporizador
 timer-label-placeholder = Etiqueta del temporizador
 timer-default-label = Temporizador { $id }
 repeat-on = Repetir: ACTIVADO

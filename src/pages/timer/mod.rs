@@ -26,4 +26,10 @@ pub enum Message {
     DeleteTimer(u32),
     BrowseCustomSound,
     Tick,
+    // Edit mode
+    ToggleEditMode,
+    StartDrag(usize),
+    Reorder(usize, usize),
+    FinishDrag,
+    CancelDrag,
 }

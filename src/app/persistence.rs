@@ -282,6 +282,9 @@ pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
         edit_repeat: false,
         edit_repeat_count: 1,
         edit_sound: "Bell".to_string(),
+        edit_mode: false,
+        dragging_index: None,
+        pre_drag_order: Vec::new(),
     }
 }
 

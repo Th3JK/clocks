@@ -419,6 +419,10 @@ impl cosmic::Application for AppModel {
                         return Task::none();
                     }
                     self.timer.update(msg.clone());
+                    if self.context_page == ContextPage::TimerAdd {
+                        self.timer.editing = false;
+                        self.core.window.show_context = false;
+                    }
                 }
                 timer::Message::StartNew | timer::Message::StartEditTimer(_) => {
                     if let timer::Message::StartEditTimer(id) = msg {
@@ -671,6 +675,10 @@ impl cosmic::Application for AppModel {
                     }
                     Some(DestructiveAction::DeleteTimer(id)) => {
                         self.timer.update(timer::Message::DeleteTimer(id));
+                        if self.context_page == ContextPage::TimerAdd {
+                            self.timer.editing = false;
+                            self.core.window.show_context = false;
+                        }
                     }
                     Some(DestructiveAction::DeleteWorldClock(id)) => {
                         self.world_clocks.update(world_clocks::Message::RemoveClock(id));

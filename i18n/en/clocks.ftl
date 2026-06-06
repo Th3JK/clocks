@@ -130,6 +130,7 @@ day-sun = Sun
 # Timer
 timer-title = Timer
 no-timers = No timers set
+create-timer = Create timer
 timer-label-placeholder = Timer label
 timer-default-label = Timer { $id }
 repeat-on = Repeat: ON

@@ -157,6 +157,38 @@ impl TimerState {
             Message::DeleteTimer(id) => {
                 self.timers.retain(|t| t.id != id);
             }
+            Message::ToggleEditMode => {
+                self.edit_mode = !self.edit_mode;
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::StartDrag(index) => {
+                self.pre_drag_order = self.timers.iter().map(|t| t.id).collect();
+                self.dragging_index = Some(index);
+            }
+            Message::Reorder(from, to) => {
+                if from < self.timers.len() && to <= self.timers.len() && from != to {
+                    let item = self.timers.remove(from);
+                    let insert_at = if to > from { to - 1 } else { to };
+                    self.timers
+                        .insert(insert_at.min(self.timers.len()), item);
+                    self.dragging_index = Some(insert_at.min(self.timers.len()));
+                }
+            }
+            Message::FinishDrag => {
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::CancelDrag => {
+                if !self.pre_drag_order.is_empty() {
+                    let order = &self.pre_drag_order;
+                    self.timers.sort_by_key(|t| {
+                        order.iter().position(|&id| id == t.id).unwrap_or(usize::MAX)
+                    });
+                }
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
             Message::Tick => {
                 for timer in &mut self.timers {
                     if timer.is_running

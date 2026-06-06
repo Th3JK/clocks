@@ -130,6 +130,7 @@ day-sun = Вс
 # Timer
 timer-title = Таймер
 no-timers = Нет установленных таймеров
+create-timer = Создать таймер
 timer-label-placeholder = Название таймера
 timer-default-label = Таймер { $id }
 repeat-on = Повтор: ВКЛ
