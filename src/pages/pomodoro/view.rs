@@ -1,124 +1,574 @@
 // SPDX-License-Identifier: MIT
 //
-// Pomodoro view functions: main page view and settings sidebar.
+// Pomodoro view functions: stats header, card grid, edit mode, empty state,
+// and the settings sidebar. Mirrors the Timer page design language.
 
-use super::model::*;
 use super::Message;
-use crate::components::{format_duration, sound_selector_view};
+use super::model::*;
+use crate::components::reorder_list::ReorderList;
+use crate::components::{CircularProgress, format_duration_hms, sound_selector_view};
 use crate::fl;
-use cosmic::iced::{Alignment, Length};
+use cosmic::iced::font::Weight;
+use cosmic::iced::{Alignment, Color, Length};
 use cosmic::prelude::*;
 use cosmic::widget;
 
-impl PomodoroState {
-    /// Main view: page header + all pomodoro timers
-    pub fn view(&self) -> Element<'_, Message> {
-        let spacing = 12;
-        let mut col = widget::column::with_capacity(self.timers.len() * 5 + 2).spacing(spacing);
+/// Font weight 300 (Light) for the pomodoro time display, matching the other pages.
+fn light_font() -> cosmic::iced::Font {
+    cosmic::iced::Font {
+        weight: Weight::Light,
+        ..cosmic::font::default()
+    }
+}
 
-        // Page header
-        let header = widget::row::with_capacity(2)
-            .align_y(Alignment::Center)
-            .push(widget::text::title3(fl!("pomodoro-title")).width(Length::Fill))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-                    .tooltip(fl!("tooltip-add"))
-                    .on_press(Message::OpenSettings),
-            );
-        col = col.push(header);
+/// Format a focus duration as "Xh Ym" (or "Ym" under an hour).
+fn format_focus(secs: u64) -> String {
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    if h > 0 {
+        fl!(
+            "focus-hours-minutes",
+            hours = h.to_string(),
+            minutes = m.to_string()
+        )
+    } else {
+        fl!("focus-minutes", minutes = m.to_string())
+    }
+}
+
+impl PomodoroState {
+    /// Main view: dispatches to card grid or edit mode.
+    pub fn view(&self) -> Element<'_, Message> {
+        if self.edit_mode {
+            self.edit_mode_view()
+        } else {
+            self.card_grid_view()
+        }
+    }
+
+    /// Base view: header + stats + card grid (or empty state).
+    fn card_grid_view(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let mut col = widget::column::with_capacity(4)
+            .spacing(spacing.space_s)
+            .width(Length::Fill)
+            .height(Length::Fill);
+
+        col = col.push(self.header_row());
 
         if self.timers.is_empty() {
-            col = col.push(
-                widget::container(widget::text::body(fl!("no-pomodoro-timers")))
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill)
-                    .padding(24),
-            );
-        }
+            col = col.push(self.empty_state());
+        } else {
+            col = col.push(self.stats_row());
 
-        for timer in &self.timers {
-            let id = timer.id;
+            let cards: Vec<Element<'_, Message>> = self
+                .timers
+                .iter()
+                .map(|timer| self.pomodoro_card(timer))
+                .collect();
 
-            col = col.push(widget::divider::horizontal::default());
+            let grid = widget::flex_row(cards)
+                .spacing(spacing.space_s as u16)
+                .min_item_width(280.0)
+                .width(Length::Fill);
 
-            // Label row with Edit/Delete aligned right
-            let mut label_row = widget::row::with_capacity(3)
-                .spacing(spacing)
-                .align_y(Alignment::Center)
-                .push(
-                    widget::text::title4(&timer.label).width(Length::Fill),
-                );
-            if !timer.is_running {
-                label_row = label_row.push(
-                    widget::button::icon(widget::icon::from_name("edit-symbolic"))
-                        .tooltip(fl!("tooltip-edit"))
-                        .on_press(Message::StartEditPomodoro(id)),
-                );
-            }
-            label_row = label_row.push(
-                widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
-                    .tooltip(fl!("tooltip-delete"))
-                    .on_press(Message::Delete(id)),
-            );
-            col = col.push(label_row);
-
-            // Session info
-            let session_info = fl!("session-info",
-                number = timer.session_number.to_string(),
-                session_type = timer.session_type.display_name()
-            );
-            col = col.push(widget::text::caption(session_info));
-
-            // Time display
-            col = col.push(
-                widget::container(widget::text::title1(format_duration(timer.remaining)))
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill)
-                    .padding(12),
-            );
-
-            // Controls (without Edit/Delete, those are now in the label row)
-            let mut controls = widget::row::with_capacity(3)
-                .spacing(spacing)
-                .align_y(Alignment::Center);
-
-            if timer.is_running {
-                controls =
-                    controls.push(widget::button::standard(fl!("pause")).on_press(Message::Pause(id)));
-            } else if timer.remaining < timer.started_remaining
-                || (timer.completed_work_sessions > 0 && timer.session_type == SessionType::Work)
-            {
-                controls = controls
-                    .push(widget::button::suggested(fl!("resume")).on_press(Message::Resume(id)));
-            } else {
-                controls =
-                    controls.push(widget::button::suggested(fl!("start")).on_press(Message::Start(id)));
-            }
-
-            controls = controls.push(widget::button::standard(fl!("skip")).on_press(Message::Skip(id)));
-            controls =
-                controls.push(widget::button::destructive(fl!("reset")).on_press(Message::Reset(id)));
-
-            col = col.push(
-                widget::container(controls)
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill),
-            );
-
-            // Progress
-            let progress_text = fl!("progress-info",
-                completed = timer.completed_work_sessions.to_string(),
-                target = timer.target_sessions.to_string(),
-                focused = (timer.total_focused_secs / 60).to_string()
-            );
-            col = col.push(
-                widget::container(widget::text::caption(progress_text))
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill),
-            );
+            col = col.push(grid);
         }
 
         col.into()
+    }
+
+    /// Row of statistics cards: focus today, current streak, and a weekly bar chart.
+    fn stats_row(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let focus_card = self.stat_card(fl!("stat-focus-today"), format_focus(self.focus_today()));
+        let streak_card = self.stat_card(
+            fl!("stat-streak"),
+            fl!("stat-streak-days", count = self.current_streak().to_string()),
+        );
+        let week_card = self.weekly_card();
+
+        widget::flex_row(vec![focus_card, streak_card, week_card])
+            .spacing(spacing.space_s as u16)
+            .min_item_width(160.0)
+            .width(Length::Fill)
+            .into()
+    }
+
+    /// A single titled statistic card with a large value.
+    fn stat_card(&self, title: String, value: String) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+        let col = widget::column::with_capacity(2)
+            .spacing(spacing.space_xxs)
+            .push(widget::text::caption(title))
+            .push(widget::text(value).size(24.0).font(light_font()));
+
+        themed_card(col.into(), spacing.space_s)
+    }
+
+    /// Weekly focus trend as a 7-bar mini chart.
+    fn weekly_card(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+        let accent = cosmic::theme::active().cosmic().accent_color();
+
+        let days = self.last_7_days();
+        let max = days.iter().map(|(_, s)| *s).max().unwrap_or(0).max(1);
+
+        let bar_max_height = 40.0_f32;
+        let bars: Vec<Element<'_, Message>> = days
+            .iter()
+            .map(|(label, secs)| {
+                let frac = *secs as f32 / max as f32;
+                let bar_height = (frac * bar_max_height).max(2.0);
+                let accent: Color = accent.into();
+
+                let bar = widget::container(widget::Space::new().width(Length::Fill))
+                    .width(Length::Fill)
+                    .height(Length::Fixed(bar_height))
+                    .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
+                        cosmic::iced_widget::container::Style {
+                            background: Some(cosmic::iced::Background::Color(accent)),
+                            border: cosmic::iced::Border {
+                                radius: theme.cosmic().radius_xs().into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    })));
+
+                // Anchor the bar to the bottom of a fixed-height area.
+                let bar_area = widget::container(bar)
+                    .height(Length::Fixed(bar_max_height))
+                    .align_y(Alignment::End)
+                    .width(Length::Fill);
+
+                widget::column::with_capacity(2)
+                    .spacing(spacing.space_xxxs)
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill)
+                    .push(bar_area)
+                    .push(widget::text::caption(label.clone()))
+                    .into()
+            })
+            .collect();
+
+        let chart = widget::row::with_children(bars)
+            .spacing(spacing.space_xxxs)
+            .align_y(Alignment::End);
+
+        let col = widget::column::with_capacity(2)
+            .spacing(spacing.space_xxs)
+            .push(widget::text::caption(fl!("stat-this-week")))
+            .push(chart);
+
+        themed_card(col.into(), spacing.space_s)
+    }
+
+    /// A single pomodoro timer card with circular progress, session info, and controls.
+    fn pomodoro_card<'a>(&'a self, timer: &'a PomodoroTimer) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+        let id = timer.id;
+
+        let total = timer.session_total().as_secs_f32();
+        let progress = if total > 0.0 {
+            1.0 - (timer.remaining.as_secs_f32() / total)
+        } else {
+            0.0
+        };
+
+        let accent = cosmic::theme::active().cosmic().accent_color();
+        let track_color = Color::from_rgba(0.5, 0.5, 0.5, 0.15);
+
+        let circle_size = 170.0;
+        let circle = CircularProgress::new(progress)
+            .size(circle_size)
+            .stroke_width(6.0)
+            .track_color(track_color)
+            .fill_color(accent.into())
+            .view();
+
+        let time_text = widget::text(format_duration_hms(timer.remaining))
+            .size(28.0)
+            .font(light_font());
+
+        let circle_with_time = widget::container(
+            cosmic::iced_widget::stack![
+                circle,
+                widget::container(time_text)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(circle_size)
+                    .height(circle_size),
+            ]
+            .width(circle_size)
+            .height(circle_size),
+        )
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        let label = widget::container(widget::text::title4(&timer.label))
+            .align_x(Alignment::Center)
+            .width(Length::Fill);
+
+        let session_info = widget::container(widget::text::caption(fl!(
+            "session-info",
+            number = timer.session_number.to_string(),
+            session_type = timer.session_type.display_name()
+        )))
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        let controls = self.card_controls(timer);
+
+        let footer = widget::container(widget::text::caption(fl!(
+            "progress-info",
+            completed = timer.completed_work_sessions.to_string(),
+            target = timer.target_sessions.to_string(),
+            focused = (timer.total_focused_secs / 60).to_string()
+        )))
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        let card_col = widget::column::with_capacity(5)
+            .spacing(spacing.space_xxs)
+            .align_x(Alignment::Center)
+            .padding(spacing.space_s)
+            .push(circle_with_time)
+            .push(label)
+            .push(session_info)
+            .push(controls)
+            .push(footer);
+
+        let card = widget::container(card_col)
+            .width(Length::Fill)
+            .max_width(340.0)
+            .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                let mut style = cosmic::iced_widget::container::Catalog::style(
+                    theme,
+                    &cosmic::theme::Container::Primary,
+                );
+                style.border.radius = theme.cosmic().radius_s().into();
+                style.background = Some(Color::from(theme.cosmic().bg_component_color()).into());
+                style
+            })));
+
+        // Whole card opens the settings sidebar when the timer is not running.
+        if !timer.is_running {
+            widget::mouse_area(card)
+                .on_press(Message::StartEditPomodoro(id))
+                .into()
+        } else {
+            card.into()
+        }
+    }
+
+    /// Reset (left) + Play/Pause (center) + Skip (right). Mirrors the Timer card
+    /// controls (48px primary, 32px secondary).
+    fn card_controls(&self, timer: &PomodoroTimer) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+        let id = timer.id;
+
+        let (primary_icon, primary_tooltip, primary_msg, use_accent) = if timer.is_running {
+            (
+                "media-playback-pause-symbolic",
+                fl!("tooltip-pause"),
+                Message::Pause(id),
+                false,
+            )
+        } else if timer.remaining < timer.session_total() {
+            (
+                "media-playback-start-symbolic",
+                fl!("tooltip-resume"),
+                Message::Resume(id),
+                true,
+            )
+        } else {
+            (
+                "media-playback-start-symbolic",
+                fl!("tooltip-start"),
+                Message::Start(id),
+                true,
+            )
+        };
+
+        let primary_btn = widget::tooltip(
+            widget::button::custom(
+                widget::container(widget::icon::from_name(primary_icon).size(24).icon())
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(48)
+                    .height(48),
+            )
+            .class(if use_accent {
+                cosmic::theme::Button::Suggested
+            } else {
+                cosmic::theme::Button::Standard
+            })
+            .on_press(primary_msg),
+            widget::text::body(primary_tooltip),
+            widget::tooltip::Position::Top,
+        );
+
+        let small_btn = |icon: &str, tip: String, msg: Message| -> Element<'_, Message> {
+            widget::tooltip(
+                widget::button::custom(
+                    widget::container(widget::icon::from_name(icon).size(16).icon())
+                        .align_x(Alignment::Center)
+                        .align_y(Alignment::Center)
+                        .width(32)
+                        .height(32),
+                )
+                .class(cosmic::theme::Button::Standard)
+                .on_press(msg),
+                widget::text::body(tip),
+                widget::tooltip::Position::Top,
+            )
+            .into()
+        };
+
+        let invisible_btn = || -> Element<'_, Message> {
+            widget::button::custom(
+                widget::container(widget::Space::new())
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(32)
+                    .height(32),
+            )
+            .class(cosmic::theme::Button::Custom {
+                active: Box::new(|_, _| widget::button::Style::default()),
+                disabled: Box::new(|_| widget::button::Style::default()),
+                hovered: Box::new(|_, _| widget::button::Style::default()),
+                pressed: Box::new(|_, _| widget::button::Style::default()),
+            })
+            .into()
+        };
+
+        let left_slot: Element<'_, Message> = if timer.has_started() {
+            small_btn("edit-undo-symbolic", fl!("tooltip-reset"), Message::Reset(id))
+        } else {
+            invisible_btn()
+        };
+        let skip_slot: Element<'_, Message> =
+            small_btn("media-skip-forward-symbolic", fl!("tooltip-skip"), Message::Skip(id));
+
+        widget::container(
+            widget::row::with_capacity(3)
+                .spacing(spacing.space_s)
+                .align_y(Alignment::Center)
+                .push(left_slot)
+                .push(primary_btn)
+                .push(skip_slot),
+        )
+        .align_x(Alignment::Center)
+        .width(Length::Fill)
+        .into()
+    }
+
+    /// Edit mode view: card list with delete buttons and drag handles.
+    fn edit_mode_view(&self) -> Element<'_, Message> {
+        let cosmic::cosmic_theme::Spacing {
+            space_xxs,
+            space_xs,
+            space_xxxs,
+            ..
+        } = cosmic::theme::spacing();
+
+        let mut col = widget::column::with_capacity(self.timers.len() + 2).spacing(space_xxs);
+
+        col = col.push(self.header_row());
+
+        if self.timers.is_empty() {
+            col = col.push(self.empty_state());
+            return col.into();
+        }
+
+        let dragging = self.dragging_index;
+
+        let card_rows: Vec<Element<'_, Message>> = self
+            .timers
+            .iter()
+            .enumerate()
+            .map(|(i, timer)| {
+                if dragging == Some(i) {
+                    return widget::container(widget::Space::new().width(Length::Fill))
+                        .height(Length::Fixed(4.0))
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                            let accent = Color::from(theme.cosmic().accent_color());
+                            cosmic::iced_widget::container::Style {
+                                background: Some(cosmic::iced::Background::Color(accent)),
+                                border: cosmic::iced::Border {
+                                    radius: 2.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        })))
+                        .into();
+                }
+
+                let id = timer.id;
+                let mut items: Vec<Element<'_, Message>> = Vec::with_capacity(3);
+
+                items.push(
+                    widget::icon::from_name("grip-lines-symbolic")
+                        .size(16)
+                        .icon()
+                        .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                            |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                color: Some(theme.cosmic().palette.neutral_7.into()),
+                            },
+                        )))
+                        .into(),
+                );
+
+                let info_col = widget::column::with_capacity(2)
+                    .spacing(space_xxxs)
+                    .push(widget::text::body(&timer.label))
+                    .push(widget::text::title4(format_duration_hms(timer.remaining)));
+                items.push(info_col.width(Length::Fill).into());
+
+                items.push(
+                    widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                        .extra_small()
+                        .tooltip(fl!("tooltip-delete"))
+                        .on_press(Message::Delete(id))
+                        .into(),
+                );
+
+                let content = widget::row::with_children(items)
+                    .spacing(space_xs)
+                    .align_y(Alignment::Center);
+
+                widget::container(content)
+                    .padding(8)
+                    .width(Length::Fill)
+                    .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                            theme,
+                            &cosmic::theme::Container::Primary,
+                        );
+                        style.border.radius = theme.cosmic().radius_s().into();
+                        style.background =
+                            Some(Color::from(theme.cosmic().bg_component_color()).into());
+                        style
+                    })))
+                    .into()
+            })
+            .collect();
+
+        let cards = widget::column::with_children(card_rows).spacing(space_xxs);
+        let item_count = self.timers.len();
+
+        let timers_snapshot: Vec<(String, String)> = self
+            .timers
+            .iter()
+            .map(|t| (t.label.clone(), format_duration_hms(t.remaining)))
+            .collect();
+
+        let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
+            .on_start_drag(Message::StartDrag)
+            .on_reorder(Message::Reorder)
+            .on_finish(Message::FinishDrag)
+            .on_cancel(Message::CancelDrag)
+            .drag_icon(move |index, offset| {
+                let (label, time_str) = timers_snapshot
+                    .get(index)
+                    .cloned()
+                    .unwrap_or_else(|| ("Pomodoro".to_string(), String::new()));
+
+                let content = widget::row::with_children(vec![
+                    widget::icon::from_name("grip-lines-symbolic")
+                        .size(16)
+                        .icon()
+                        .into(),
+                    widget::column::with_capacity(2)
+                        .push(widget::text::body(label))
+                        .push(widget::text::title4(time_str))
+                        .width(Length::Fill)
+                        .into(),
+                ])
+                .spacing(space_xs)
+                .align_y(Alignment::Center);
+
+                let card: Element<'static, ()> = widget::container(content)
+                    .padding(8)
+                    .width(Length::Fill)
+                    .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                        let accent = Color::from(theme.cosmic().accent_color());
+                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                            theme,
+                            &cosmic::theme::Container::Primary,
+                        );
+                        style.border.radius = theme.cosmic().radius_s().into();
+                        style.border.color = accent;
+                        style.border.width = 2.0;
+                        style.background =
+                            Some(Color::from(theme.cosmic().bg_component_color()).into());
+                        style
+                    })))
+                    .into();
+
+                (card, cosmic::iced_core::widget::tree::State::None, offset)
+            });
+
+        col = col.push(reorder_list);
+        col.into()
+    }
+
+    /// Shared header: title + edit toggle (when timers exist) + add button.
+    fn header_row(&self) -> Element<'_, Message> {
+        let mut header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(widget::text::title3(fl!("pomodoro-title")).width(Length::Fill));
+
+        if !self.timers.is_empty() {
+            let (edit_icon, edit_tooltip) = if self.edit_mode {
+                ("object-select-symbolic", fl!("tooltip-done-editing"))
+            } else {
+                ("edit-symbolic", fl!("tooltip-edit-mode"))
+            };
+            header = header.push(
+                widget::button::icon(widget::icon::from_name(edit_icon))
+                    .tooltip(edit_tooltip)
+                    .on_press(Message::ToggleEditMode),
+            );
+        }
+
+        header = header.push(
+            widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                .tooltip(fl!("tooltip-add"))
+                .on_press(Message::OpenSettings),
+        );
+
+        header.into()
+    }
+
+    /// Centered empty state: large icon + create button.
+    fn empty_state(&self) -> Element<'_, Message> {
+        let icon = widget::icon::from_name("appointment-soon-symbolic")
+            .size(128)
+            .icon()
+            .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                    color: Some(theme.cosmic().palette.neutral_5.into()),
+                },
+            )));
+
+        let empty_state = widget::column::with_capacity(2)
+            .spacing(16)
+            .align_x(Alignment::Center)
+            .push(icon)
+            .push(widget::button::suggested(fl!("create-pomodoro")).on_press(Message::OpenSettings));
+
+        widget::container(empty_state)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Center)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 
     /// Settings sidebar view
@@ -142,13 +592,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("work-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultWorkMinutes(w.saturating_sub(5))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = w.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultWorkMinutes(w + 5)),
                 );
             col = col.push(work_row);
@@ -160,13 +608,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("short-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultShortBreakMinutes(sb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = sb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultShortBreakMinutes(sb + 1)),
                 );
             col = col.push(short_row);
@@ -178,13 +624,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("long-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultLongBreakMinutes(lb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = lb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultLongBreakMinutes(lb + 1)),
                 );
             col = col.push(long_row);
@@ -226,13 +670,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("work-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultWorkMinutes(w.saturating_sub(5))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = w.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultWorkMinutes(w + 5)),
                 );
             col = col.push(work_row);
@@ -244,13 +686,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("short-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultShortBreakMinutes(sb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = sb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultShortBreakMinutes(sb + 1)),
                 );
             col = col.push(short_row);
@@ -262,13 +702,11 @@ impl PomodoroState {
                 .push(widget::text::body(fl!("long-break-label")).width(Length::Fixed(100.0)))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
                         .on_press(Message::SetDefaultLongBreakMinutes(lb.saturating_sub(1))),
                 )
                 .push(widget::text::body(fl!("minutes-value", value = lb.to_string())))
                 .push(
                     widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
                         .on_press(Message::SetDefaultLongBreakMinutes(lb + 1)),
                 );
             col = col.push(long_row);
@@ -276,4 +714,21 @@ impl PomodoroState {
 
         col.into()
     }
+}
+
+/// Wrap content in a themed primary card container with the given padding.
+fn themed_card(content: Element<'_, Message>, padding: u16) -> Element<'_, Message> {
+    widget::container(content)
+        .padding(padding)
+        .width(Length::Fill)
+        .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+            let mut style = cosmic::iced_widget::container::Catalog::style(
+                theme,
+                &cosmic::theme::Container::Primary,
+            );
+            style.border.radius = theme.cosmic().radius_s().into();
+            style.background = Some(Color::from(theme.cosmic().bg_component_color()).into());
+            style
+        })))
+        .into()
 }

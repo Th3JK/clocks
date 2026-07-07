@@ -7,7 +7,7 @@ use super::persistence::build_config_from_state;
 use super::{AppModel, Message};
 use crate::audio;
 use crate::fl;
-use crate::pages::{Page, alarm, pomodoro, stopwatch, timer};
+use crate::pages::{Page, alarm, chess, pomodoro, stopwatch, timer, workout};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Timelike, Utc};
 use cosmic::prelude::*;
@@ -37,6 +37,24 @@ impl AppModel {
             let notifications = self.pomodoro.update(pomodoro::Message::Tick);
             for (msg, sound) in notifications {
                 audio::send_notification(&fl!("notification-pomodoro"), &msg);
+                audio::play_sound(&sound);
+            }
+        }
+
+        // Chess clock tick + flag notification
+        if self.chess.is_running() {
+            let notifications = self.chess.update(chess::Message::Tick);
+            for msg in notifications {
+                audio::send_notification(&fl!("notification-chess"), &msg);
+                audio::play_sound("Bell");
+            }
+        }
+
+        // Workout tick + phase-change notifications
+        if self.workout.has_running() {
+            let notifications = self.workout.update(workout::Message::Tick);
+            for (msg, sound) in notifications {
+                audio::send_notification(&fl!("notification-workout"), &msg);
                 audio::play_sound(&sound);
             }
         }
@@ -127,6 +145,8 @@ impl AppModel {
             &self.timer,
             &self.pomodoro,
             &self.stopwatch,
+            &self.chess,
+            &self.workout,
             self.use_12h,
             self.confirm_delete_alarm,
             self.confirm_delete_timer,

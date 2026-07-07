@@ -155,7 +155,40 @@ impl PomodoroState {
                     self.default_long_break_minutes = val;
                 }
             }
+            Message::ToggleEditMode => {
+                self.edit_mode = !self.edit_mode;
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::StartDrag(index) => {
+                self.pre_drag_order = self.timers.iter().map(|t| t.id).collect();
+                self.dragging_index = Some(index);
+            }
+            Message::Reorder(from, to) => {
+                if from < self.timers.len() && to <= self.timers.len() && from != to {
+                    let item = self.timers.remove(from);
+                    let insert_at = if to > from { to - 1 } else { to };
+                    self.timers.insert(insert_at.min(self.timers.len()), item);
+                    self.dragging_index = Some(insert_at.min(self.timers.len()));
+                }
+            }
+            Message::FinishDrag => {
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::CancelDrag => {
+                if !self.pre_drag_order.is_empty() {
+                    let order = &self.pre_drag_order;
+                    self.timers.sort_by_key(|t| {
+                        order.iter().position(|&id| id == t.id).unwrap_or(usize::MAX)
+                    });
+                }
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
             Message::Tick => {
+                // Focus seconds to record after the loop (avoids a second &mut self borrow).
+                let mut completed_work_secs: Vec<u64> = Vec::new();
                 for timer in &mut self.timers {
                     if timer.is_running
                         && let Some(start) = timer.start_instant
@@ -164,6 +197,9 @@ impl PomodoroState {
                             timer.started_remaining.saturating_sub(start.elapsed());
                         if timer.remaining == Duration::ZERO {
                             let prev_type = timer.session_type;
+                            if prev_type == SessionType::Work {
+                                completed_work_secs.push(timer.work_minutes as u64 * 60);
+                            }
                             timer.advance_session();
                             notifications.push((
                                 fl!("pomodoro-transition",
@@ -175,6 +211,9 @@ impl PomodoroState {
                             ));
                         }
                     }
+                }
+                for secs in completed_work_secs {
+                    self.record_completed_work(secs);
                 }
             }
         }

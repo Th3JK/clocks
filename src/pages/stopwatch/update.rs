@@ -127,7 +127,9 @@ impl StopwatchState {
             Message::ClearHistory => {
                 self.history.clear();
             }
-            Message::OpenHistory => {
+            Message::OpenHistory
+            | Message::ExportAllHistory
+            | Message::ExportRecord(_) => {
                 // Handled in app.rs
             }
         }

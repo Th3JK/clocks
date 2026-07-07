@@ -304,8 +304,16 @@ impl StopwatchState {
             col = col.push(widget::text::caption(fl!("history-hint")));
         } else {
             col = col.push(
-                widget::button::destructive(fl!("clear-all-history"))
-                    .on_press(Message::ClearHistory),
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xs)
+                    .push(
+                        widget::button::standard(fl!("export-all-history"))
+                            .on_press(Message::ExportAllHistory),
+                    )
+                    .push(
+                        widget::button::destructive(fl!("clear-all-history"))
+                            .on_press(Message::ClearHistory),
+                    ),
             );
 
             for record in self.history.iter().rev() {
@@ -333,11 +341,15 @@ impl StopwatchState {
                     )));
                 }
 
-                let actions = widget::row::with_capacity(2)
+                let actions = widget::row::with_capacity(3)
                     .spacing(spacing.space_xs)
                     .push(
                         widget::button::suggested(fl!("resume"))
                             .on_press(Message::ResumeFromHistory(id)),
+                    )
+                    .push(
+                        widget::button::standard(fl!("export-record"))
+                            .on_press(Message::ExportRecord(id)),
                     )
                     .push(
                         widget::button::destructive(fl!("delete"))

@@ -3,10 +3,12 @@
 // Implements the `cosmic::Application` trait for `AppModel`.
 
 use super::persistence::{
-    restore_alarms, restore_pomodoros, restore_stopwatch_history, restore_timers,
-    restore_world_clocks,
+    restore_alarms, restore_chess, restore_pomodoros, restore_stopwatch_history, restore_timers,
+    restore_workouts, restore_world_clocks,
 };
-use super::subscriptions::{input_subscription, open_sound_file_dialog, tick_subscription};
+use super::subscriptions::{
+    input_subscription, open_sound_file_dialog, save_csv_dialog, tick_subscription,
+};
 use super::{
     AppModel, ConfirmationCategory, CustomSoundTarget, DestructiveAction, MenuAction, Message,
     APP_ICON, REPOSITORY,
@@ -14,7 +16,7 @@ use super::{
 use cosmic::widget::toaster;
 use crate::config::Config;
 use crate::fl;
-use crate::pages::{ContextPage, Page, alarm, pomodoro, stopwatch, timer, world_clocks};
+use crate::pages::{ContextPage, Page, alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::Length;
@@ -73,6 +75,16 @@ impl cosmic::Application for AppModel {
             .data::<Page>(Page::Pomodoro)
             .icon(icon::from_name("appointment-soon-symbolic"));
 
+        nav.insert()
+            .text(fl!("nav-chess"))
+            .data::<Page>(Page::Chess)
+            .icon(icon::from_name("view-grid-symbolic"));
+
+        nav.insert()
+            .text(fl!("nav-workout"))
+            .data::<Page>(Page::Workout)
+            .icon(icon::from_name("emblem-favorite-symbolic"));
+
         let about = About::default()
             .name(fl!("app-title"))
             .icon(widget::icon::from_svg_bytes(APP_ICON))
@@ -95,6 +107,8 @@ impl cosmic::Application for AppModel {
         let timer = restore_timers(&config);
         let pomodoro = restore_pomodoros(&config);
         let stopwatch = restore_stopwatch_history(&config);
+        let chess = restore_chess(&config);
+        let workout = restore_workouts(&config);
 
         let use_12h = config.use_12h;
         let confirm_delete_alarm = config.confirm_delete_alarm;
@@ -131,6 +145,8 @@ impl cosmic::Application for AppModel {
             alarm,
             timer,
             pomodoro,
+            chess,
+            workout,
             active_timer_id: None,
             active_pomodoro_id: None,
             alarm_audio_stops: HashMap::new(),
@@ -223,6 +239,23 @@ impl cosmic::Application for AppModel {
                 Message::ToggleContextPage(ContextPage::PomodoroSettings),
             )
             .title(fl!("pomodoro-settings")),
+            ContextPage::ChessSettings => context_drawer::context_drawer(
+                self.chess.settings_view().map(Message::Chess),
+                Message::ToggleContextPage(ContextPage::ChessSettings),
+            )
+            .title(fl!("chess-settings")),
+            ContextPage::WorkoutEdit => {
+                let title = if self.workout.editing_id.is_some() {
+                    fl!("workout-edit")
+                } else {
+                    fl!("workout-new")
+                };
+                context_drawer::context_drawer(
+                    self.workout.settings_view().map(Message::Workout),
+                    Message::ToggleContextPage(ContextPage::WorkoutEdit),
+                )
+                .title(title)
+            }
             ContextPage::Settings => context_drawer::context_drawer(
                 self.settings_view(),
                 Message::ToggleContextPage(ContextPage::Settings),
@@ -241,6 +274,8 @@ impl cosmic::Application for AppModel {
             Some(Page::Alarm) => self.alarm.view(self.use_12h, self.auto_sort_alarms).map(Message::Alarm),
             Some(Page::Timer) => self.timer.view().map(Message::Timer),
             Some(Page::Pomodoro) => self.pomodoro.view().map(Message::Pomodoro),
+            Some(Page::Chess) => self.chess.view().map(Message::Chess),
+            Some(Page::Workout) => self.workout.view().map(Message::Workout),
             None => widget::text::body(fl!("select-a-view")).into(),
         };
 
@@ -491,6 +526,17 @@ impl cosmic::Application for AppModel {
                 stopwatch::Message::Tick => {
                     self.stopwatch.update(msg.clone());
                 }
+                stopwatch::Message::ExportAllHistory => {
+                    if !self.stopwatch.history.is_empty() {
+                        let csv = self.stopwatch.history_csv();
+                        return save_csv_dialog(fl!("export-filename-all"), csv);
+                    }
+                }
+                stopwatch::Message::ExportRecord(id) => {
+                    if let Some(csv) = self.stopwatch.record_csv(*id) {
+                        return save_csv_dialog(fl!("export-filename-record"), csv);
+                    }
+                }
                 _ => {
                     self.stopwatch.update(msg.clone());
                     self.save_state();
@@ -545,6 +591,45 @@ impl cosmic::Application for AppModel {
                 }
             },
 
+            Message::Chess(ref msg) => match msg {
+                chess::Message::OpenSettings => {
+                    self.chess.update(msg.clone());
+                    self.context_page = ContextPage::ChessSettings;
+                    self.core.window.show_context = true;
+                    self.save_state();
+                    return Task::none();
+                }
+                chess::Message::Tick => {
+                    // Handled in handle_tick
+                }
+                _ => {
+                    self.chess.update(msg.clone());
+                }
+            },
+
+            Message::Workout(ref msg) => match msg {
+                workout::Message::OpenSettings | workout::Message::StartEditWorkout(_) => {
+                    self.workout.update(msg.clone());
+                    self.context_page = ContextPage::WorkoutEdit;
+                    self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("workout-label-input"));
+                }
+                workout::Message::CancelEditWorkout | workout::Message::SaveEditWorkout => {
+                    self.workout.update(msg.clone());
+                    self.core.window.show_context = false;
+                }
+                workout::Message::BrowseCustomSound => {
+                    return open_sound_file_dialog(CustomSoundTarget::Workout);
+                }
+                workout::Message::Tick => {
+                    // Handled in handle_tick
+                }
+                _ => {
+                    self.workout.update(msg.clone());
+                }
+            },
+
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
                     self.core.window.show_context = !self.core.window.show_context;
@@ -577,6 +662,9 @@ impl cosmic::Application for AppModel {
                 }
                 CustomSoundTarget::Pomodoro => {
                     self.pomodoro.update(pomodoro::Message::EditSound(path));
+                }
+                CustomSoundTarget::Workout => {
+                    self.workout.update(workout::Message::EditSound(path));
                 }
             },
 
@@ -722,6 +810,13 @@ impl cosmic::Application for AppModel {
 
             Message::CloseToast(id) => {
                 self.toasts.remove(id);
+            }
+
+            Message::ExportFinished(text) => {
+                return self
+                    .toasts
+                    .push(toaster::Toast::new(text))
+                    .map(cosmic::action::app);
             }
 
             Message::SetAutoSortAlarms(enabled) => {

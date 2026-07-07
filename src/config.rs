@@ -5,7 +5,7 @@ use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::Cosmi
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
-#[version = 3]
+#[version = 4]
 pub struct Config {
     /// Saved world clocks (timezone names)
     pub world_clocks: Vec<SavedClock>,
@@ -42,6 +42,15 @@ pub struct Config {
     /// Saved stopwatch history records
     #[serde(default)]
     pub stopwatch_history: Vec<SavedStopwatchRecord>,
+    /// Date-indexed pomodoro focus statistics (global, across all timers)
+    #[serde(default)]
+    pub pomodoro_stats: Vec<PomodoroDayStat>,
+    /// Chess clock configuration
+    #[serde(default)]
+    pub chess: SavedChessConfig,
+    /// Saved workout (HIIT/Tabata) presets
+    #[serde(default)]
+    pub workouts: Vec<SavedWorkout>,
 }
 
 fn default_true() -> bool {
@@ -66,6 +75,36 @@ impl Default for Config {
             auto_sort_world_clocks: false,
             auto_clear_stopwatch_history: false,
             stopwatch_history: Vec::new(),
+            pomodoro_stats: Vec::new(),
+            chess: SavedChessConfig::default(),
+            workouts: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedWorkout {
+    pub label: String,
+    pub prep_secs: u32,
+    pub work_secs: u32,
+    pub rest_secs: u32,
+    pub rounds: u32,
+    pub sets: u32,
+    pub set_rest_secs: u32,
+    pub sound: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedChessConfig {
+    pub base_minutes: u32,
+    pub increment_secs: u32,
+}
+
+impl Default for SavedChessConfig {
+    fn default() -> Self {
+        Self {
+            base_minutes: 5,
+            increment_secs: 0,
         }
     }
 }
@@ -112,6 +151,14 @@ pub struct SavedPomodoro {
     pub short_break_minutes: u32,
     pub long_break_minutes: u32,
     pub sound: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PomodoroDayStat {
+    /// Day in `YYYY-MM-DD` format.
+    pub date: String,
+    pub focus_secs: u64,
+    pub sessions: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

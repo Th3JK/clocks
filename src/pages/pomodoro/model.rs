@@ -3,6 +3,7 @@
 // Pomodoro data types: session types, timer state, and defaults.
 
 use crate::fl;
+use chrono::Datelike;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,6 +78,23 @@ impl PomodoroTimer {
         Duration::from_secs(self.work_minutes as u64 * 60)
     }
 
+    /// Full duration of the session currently in progress (for the progress ring).
+    pub(super) fn session_total(&self) -> Duration {
+        match self.session_type {
+            SessionType::Work => self.work_duration(),
+            SessionType::ShortBreak => self.short_break_duration(),
+            SessionType::LongBreak => self.long_break_duration(),
+        }
+    }
+
+    /// Whether this timer has progressed beyond its pristine, never-started state.
+    pub(super) fn has_started(&self) -> bool {
+        self.is_running
+            || self.remaining < self.session_total()
+            || self.session_number > 1
+            || self.completed_work_sessions > 0
+    }
+
     pub(super) fn short_break_duration(&self) -> Duration {
         Duration::from_secs(self.short_break_minutes as u64 * 60)
     }
@@ -109,6 +127,14 @@ impl PomodoroTimer {
     }
 }
 
+/// One day's aggregated focus statistics (global, across all pomodoro timers).
+#[derive(Debug, Clone)]
+pub struct DayStat {
+    pub date: chrono::NaiveDate,
+    pub focus_secs: u64,
+    pub sessions: u32,
+}
+
 pub struct PomodoroState {
     pub timers: Vec<PomodoroTimer>,
     pub next_id: u32,
@@ -123,6 +149,12 @@ pub struct PomodoroState {
     pub edit_short_break_minutes: u32,
     pub edit_long_break_minutes: u32,
     pub edit_sound: String,
+    // Edit mode (reorder/delete)
+    pub edit_mode: bool,
+    pub dragging_index: Option<usize>,
+    pub pre_drag_order: Vec<u32>,
+    // Global focus statistics, date-indexed (pruned to the last ~90 days)
+    pub daily_stats: Vec<DayStat>,
 }
 
 impl Default for PomodoroState {
@@ -139,6 +171,10 @@ impl Default for PomodoroState {
             edit_short_break_minutes: 5,
             edit_long_break_minutes: 15,
             edit_sound: "Bell".to_string(),
+            edit_mode: false,
+            dragging_index: None,
+            pre_drag_order: Vec::new(),
+            daily_stats: Vec::new(),
         };
         // Create a default pomodoro timer
         state
@@ -151,5 +187,87 @@ impl Default for PomodoroState {
 impl PomodoroState {
     pub fn is_running(&self) -> bool {
         self.timers.iter().any(|t| t.is_running)
+    }
+
+    /// Record a completed work session of `secs` into today's stats, then prune
+    /// entries older than ~90 days.
+    pub(super) fn record_completed_work(&mut self, secs: u64) {
+        let today = chrono::Local::now().date_naive();
+        if let Some(entry) = self.daily_stats.iter_mut().find(|d| d.date == today) {
+            entry.focus_secs += secs;
+            entry.sessions += 1;
+        } else {
+            self.daily_stats.push(DayStat {
+                date: today,
+                focus_secs: secs,
+                sessions: 1,
+            });
+        }
+        let cutoff = today - chrono::Duration::days(90);
+        self.daily_stats.retain(|d| d.date >= cutoff);
+        self.daily_stats.sort_by_key(|d| d.date);
+    }
+
+    /// Total focus seconds recorded for today.
+    pub fn focus_today(&self) -> u64 {
+        let today = chrono::Local::now().date_naive();
+        self.daily_stats
+            .iter()
+            .filter(|d| d.date == today)
+            .map(|d| d.focus_secs)
+            .sum()
+    }
+
+    /// Consecutive days (ending today, or yesterday if today is empty) that have
+    /// at least one completed work session.
+    pub fn current_streak(&self) -> u32 {
+        use std::collections::HashSet;
+        let days: HashSet<chrono::NaiveDate> = self
+            .daily_stats
+            .iter()
+            .filter(|d| d.sessions > 0)
+            .map(|d| d.date)
+            .collect();
+        let today = chrono::Local::now().date_naive();
+        let mut cursor = if days.contains(&today) {
+            today
+        } else {
+            today - chrono::Duration::days(1)
+        };
+        let mut streak = 0;
+        while days.contains(&cursor) {
+            streak += 1;
+            cursor -= chrono::Duration::days(1);
+        }
+        streak
+    }
+
+    /// Focus seconds for each of the last 7 days (oldest first), with a one-letter
+    /// weekday label for the chart.
+    pub fn last_7_days(&self) -> Vec<(String, u64)> {
+        let today = chrono::Local::now().date_naive();
+        (0..7)
+            .rev()
+            .map(|offset| {
+                let date = today - chrono::Duration::days(offset);
+                let secs = self
+                    .daily_stats
+                    .iter()
+                    .filter(|d| d.date == date)
+                    .map(|d| d.focus_secs)
+                    .sum();
+                let label = match date.weekday() {
+                    chrono::Weekday::Mon => "M",
+                    chrono::Weekday::Tue => "T",
+                    chrono::Weekday::Wed => "W",
+                    chrono::Weekday::Thu => "T",
+                    chrono::Weekday::Fri => "F",
+                    chrono::Weekday::Sat => "S",
+                    chrono::Weekday::Sun => "S",
+                }
+                .to_string();
+                (label, secs)
+            })
+            .collect()
     }
 }

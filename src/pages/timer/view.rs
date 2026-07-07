@@ -5,7 +5,9 @@
 use super::Message;
 use super::model::*;
 use crate::components::reorder_list::ReorderList;
-use crate::components::{CircularProgress, format_duration_hms, sound_selector_view};
+use crate::components::{
+    CircularProgress, TimeUnit, format_duration_hms, sound_selector_view, time_picker,
+};
 use crate::fl;
 use cosmic::iced::font::Weight;
 use cosmic::iced::{Alignment, Color, Length};
@@ -533,46 +535,30 @@ impl TimerState {
                 .on_input(Message::EditLabel),
         );
 
-        // Duration spinners with wrap-around (HH:MM:SS colon format)
+        // Duration spinners with wrap-around (compact vertical HH:MM:SS steppers)
         col = col.push(widget::text::body(fl!("duration")));
 
         let h = self.edit_hours;
         let m = self.edit_minutes;
         let s = self.edit_seconds;
 
-        let dur_row = widget::row::with_capacity(11)
-            .spacing(8)
-            .align_y(Alignment::Center)
-            .push(
-                widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-                    .on_press(Message::EditHours(if h == 0 { 23 } else { h - 1 })),
-            )
-            .push(widget::text::title3(format!("{:02}", h)))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-                    .on_press(Message::EditHours((h + 1) % 24)),
-            )
-            .push(widget::text::title3(":"))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-                    .on_press(Message::EditMinutes(if m == 0 { 59 } else { m - 1 })),
-            )
-            .push(widget::text::title3(format!("{:02}", m)))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-                    .on_press(Message::EditMinutes((m + 1) % 60)),
-            )
-            .push(widget::text::title3(":"))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-                    .on_press(Message::EditSeconds(if s == 0 { 59 } else { s - 1 })),
-            )
-            .push(widget::text::title3(format!("{:02}", s)))
-            .push(
-                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-                    .on_press(Message::EditSeconds((s + 1) % 60)),
-            );
-        col = col.push(dur_row);
+        col = col.push(time_picker(vec![
+            TimeUnit::new(
+                format!("{:02}", h),
+                Message::EditHours((h + 1) % 24),
+                Message::EditHours(if h == 0 { 23 } else { h - 1 }),
+            ),
+            TimeUnit::new(
+                format!("{:02}", m),
+                Message::EditMinutes((m + 1) % 60),
+                Message::EditMinutes(if m == 0 { 59 } else { m - 1 }),
+            ),
+            TimeUnit::new(
+                format!("{:02}", s),
+                Message::EditSeconds((s + 1) % 60),
+                Message::EditSeconds(if s == 0 { 59 } else { s - 1 }),
+            ),
+        ]));
 
         // Repeat toggle
         col = col.push(widget::text::body(fl!("repeat")));

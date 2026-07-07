@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 pub mod alarm;
+pub mod chess;
 pub mod pomodoro;
 pub mod stopwatch;
 pub mod timer;
+pub mod workout;
 pub mod world_clocks;
 
 /// Navigation pages in the app
@@ -14,6 +16,8 @@ pub enum Page {
     Alarm,
     Timer,
     Pomodoro,
+    Chess,
+    Workout,
 }
 
 /// Context drawer pages
@@ -27,4 +31,6 @@ pub enum ContextPage {
     AlarmEdit,
     TimerAdd,
     PomodoroSettings,
+    ChessSettings,
+    WorkoutEdit,
 }

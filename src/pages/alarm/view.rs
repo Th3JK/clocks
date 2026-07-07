@@ -6,7 +6,7 @@ use super::model::*;
 use super::update::hour24_to_12;
 use super::Message;
 use crate::components::reorder_list::ReorderList;
-use crate::components::sound_selector_view;
+use crate::components::{sound_selector_view, time_picker, TimeUnit};
 use crate::fl;
 use cosmic::iced::{Alignment, Color, Length};
 use cosmic::prelude::*;
@@ -359,38 +359,20 @@ impl AlarmState {
                         .on_input(Message::EditLabel),
                 );
 
-            // Time spinners with wrap-around
-            let hour_str = format!("{:02}", edit.hour);
-            let minute_str = format!("{:02}", edit.minute);
-
+            // Time spinners with wrap-around (compact vertical steppers)
             col = col.push(widget::text::body(fl!("time")));
-            let time_row = widget::row::with_capacity(8)
-                .spacing(8)
-                .align_y(Alignment::Center)
-                .push(
-                    widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
-                        .on_press(Message::DecrementHour),
-                )
-                .push(widget::text::title3(hour_str))
-                .push(
-                    widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
-                        .on_press(Message::IncrementHour),
-                )
-                .push(widget::text::title3(":"))
-                .push(
-                    widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
-
-                        .on_press(Message::DecrementMinute),
-                )
-                .push(widget::text::title3(minute_str))
-                .push(
-                    widget::button::icon(widget::icon::from_name("list-add-symbolic"))
-
-                        .on_press(Message::IncrementMinute),
-                );
-            col = col.push(time_row);
+            col = col.push(time_picker(vec![
+                TimeUnit::new(
+                    format!("{:02}", edit.hour),
+                    Message::IncrementHour,
+                    Message::DecrementHour,
+                ),
+                TimeUnit::new(
+                    format!("{:02}", edit.minute),
+                    Message::IncrementMinute,
+                    Message::DecrementMinute,
+                ),
+            ]));
 
             // AM/PM selector (only in 12h mode)
             if use_12h {
@@ -440,21 +422,24 @@ impl AlarmState {
                 RepeatMode::Custom(days) => days.clone(),
                 _ => Vec::new(),
             };
-            let mut days_row = widget::row::with_capacity(7).spacing(4);
-            for day in DayOfWeek::all() {
-                let is_selected = selected_days.contains(day);
-                if is_selected {
-                    days_row = days_row.push(
+            let day_buttons: Vec<Element<'_, Message>> = DayOfWeek::all()
+                .iter()
+                .map(|day| {
+                    let is_selected = selected_days.contains(day);
+                    if is_selected {
                         widget::button::suggested(day.display_name())
-                            .on_press(Message::ToggleDay(*day)),
-                    );
-                } else {
-                    days_row = days_row.push(
+                            .on_press(Message::ToggleDay(*day))
+                            .into()
+                    } else {
                         widget::button::standard(day.display_name())
-                            .on_press(Message::ToggleDay(*day)),
-                    );
-                }
-            }
+                            .on_press(Message::ToggleDay(*day))
+                            .into()
+                    }
+                })
+                .collect();
+            // Use a wrapping flex row so day buttons reflow onto multiple lines on
+            // narrow windows instead of overflowing off-screen (Sat/Sun unclickable).
+            let days_row = widget::flex_row(day_buttons).spacing(4).min_item_width(56.0);
             col = col.push(days_row);
 
             // Snooze duration

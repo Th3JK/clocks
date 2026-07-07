@@ -8,7 +8,7 @@ mod subscriptions;
 
 use crate::config::Config;
 use crate::pages::ContextPage;
-use crate::pages::{alarm, pomodoro, stopwatch, timer, world_clocks};
+use crate::pages::{alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
 use cosmic::cosmic_config;
 use cosmic::widget::{about::About, menu, nav_bar, toaster};
 use std::collections::HashMap;
@@ -71,6 +71,8 @@ pub struct AppModel {
     alarm: alarm::AlarmState,
     timer: timer::TimerState,
     pomodoro: pomodoro::PomodoroState,
+    chess: chess::ChessState,
+    workout: workout::WorkoutState,
 
     // Last-active item IDs for keyboard shortcut targeting (session-only, not persisted)
     active_timer_id: Option<u32>,
@@ -96,6 +98,8 @@ pub enum Message {
     Alarm(alarm::Message),
     Timer(timer::Message),
     Pomodoro(pomodoro::Message),
+    Chess(chess::Message),
+    Workout(workout::Message),
     CustomSoundSelected(CustomSoundTarget, String),
     SetTimeFormat(bool),
     // Keyboard shortcuts
@@ -117,6 +121,8 @@ pub enum Message {
     ToggleConfirmationSetting(ConfirmationCategory, bool),
     // Toast notifications
     CloseToast(toaster::ToastId),
+    // CSV export result (toast message text)
+    ExportFinished(String),
     // Auto-sorting
     SetAutoSortAlarms(bool),
     SetAutoSortWorldClocks(bool),
@@ -128,6 +134,7 @@ pub enum CustomSoundTarget {
     Alarm,
     Timer,
     Pomodoro,
+    Workout,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

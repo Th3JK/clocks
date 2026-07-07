@@ -4,10 +4,10 @@
 // and restoring page states from a saved `Config`.
 
 use crate::config::{
-    Config, PomodoroDefaults, SavedAlarm, SavedClock, SavedLap, SavedPomodoro, SavedRepeatMode,
-    SavedStopwatchRecord, SavedTimer,
+    Config, PomodoroDayStat, PomodoroDefaults, SavedAlarm, SavedChessConfig, SavedClock, SavedLap,
+    SavedPomodoro, SavedRepeatMode, SavedStopwatchRecord, SavedTimer, SavedWorkout,
 };
-use crate::pages::{alarm, pomodoro, stopwatch, timer, world_clocks};
+use crate::pages::{alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
 use std::time::Duration;
 
 // --- Persistence: build Config from runtime state ---
@@ -19,6 +19,8 @@ pub(super) fn build_config_from_state(
     ti: &timer::TimerState,
     po: &pomodoro::PomodoroState,
     sw: &stopwatch::StopwatchState,
+    ch: &chess::ChessState,
+    wo: &workout::WorkoutState,
     use_12h: bool,
     confirm_delete_alarm: bool,
     confirm_delete_timer: bool,
@@ -93,6 +95,16 @@ pub(super) fn build_config_from_state(
         long_break_minutes: po.default_long_break_minutes,
     };
 
+    let pomodoro_stats = po
+        .daily_stats
+        .iter()
+        .map(|d| PomodoroDayStat {
+            date: d.date.format("%Y-%m-%d").to_string(),
+            focus_secs: d.focus_secs,
+            sessions: d.sessions,
+        })
+        .collect();
+
     let stopwatch_history = sw
         .history
         .iter()
@@ -107,6 +119,26 @@ pub(super) fn build_config_from_state(
                     delta_ms: l.delta,
                 })
                 .collect(),
+        })
+        .collect();
+
+    let chess = SavedChessConfig {
+        base_minutes: ch.base_minutes,
+        increment_secs: ch.increment_secs,
+    };
+
+    let workouts = wo
+        .workouts
+        .iter()
+        .map(|w| SavedWorkout {
+            label: w.label.clone(),
+            prep_secs: w.prep_secs,
+            work_secs: w.work_secs,
+            rest_secs: w.rest_secs,
+            rounds: w.rounds,
+            sets: w.sets,
+            set_rest_secs: w.set_rest_secs,
+            sound: w.sound.clone(),
         })
         .collect();
 
@@ -126,7 +158,40 @@ pub(super) fn build_config_from_state(
         auto_sort_world_clocks,
         auto_clear_stopwatch_history,
         stopwatch_history,
+        pomodoro_stats,
+        chess,
+        workouts,
     }
+}
+
+pub(super) fn restore_chess(config: &Config) -> chess::ChessState {
+    chess::ChessState::new(config.chess.base_minutes, config.chess.increment_secs)
+}
+
+pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
+    if config.workouts.is_empty() {
+        return workout::WorkoutState::default();
+    }
+
+    let mut state = workout::WorkoutState {
+        workouts: Vec::new(),
+        ..Default::default()
+    };
+    for (i, w) in config.workouts.iter().enumerate() {
+        state.workouts.push(workout::WorkoutEntry::new(
+            (i + 1) as u32,
+            w.label.clone(),
+            w.prep_secs,
+            w.work_secs,
+            w.rest_secs,
+            w.rounds,
+            w.sets,
+            w.set_rest_secs,
+            w.sound.clone(),
+        ));
+    }
+    state.next_id = config.workouts.len() as u32 + 1;
+    state
 }
 
 // --- Persistence: restore runtime state from Config ---
@@ -316,6 +381,21 @@ pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
         }
         state.next_id = config.pomodoros.len() as u32;
     }
+
+    state.daily_stats = config
+        .pomodoro_stats
+        .iter()
+        .filter_map(|d| {
+            chrono::NaiveDate::parse_from_str(&d.date, "%Y-%m-%d")
+                .ok()
+                .map(|date| pomodoro::DayStat {
+                    date,
+                    focus_secs: d.focus_secs,
+                    sessions: d.sessions,
+                })
+        })
+        .collect();
+    state.daily_stats.sort_by_key(|d| d.date);
 
     state
 }

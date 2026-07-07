@@ -113,3 +113,35 @@ pub(super) fn open_sound_file_dialog(
         }
     })
 }
+
+/// Open a save-file dialog and write the given CSV `contents` to the chosen path.
+/// Emits `Message::ExportFinished` with a localized success/failure message.
+pub(super) fn save_csv_dialog(
+    suggested_name: String,
+    contents: String,
+) -> Task<cosmic::Action<Message>> {
+    cosmic::task::future(async move {
+        let dialog = cosmic::dialog::file_chooser::save::Dialog::new()
+            .title(crate::fl!("export-csv"))
+            .file_name(suggested_name);
+
+        match dialog.save_file().await {
+            Ok(response) => {
+                let written = response
+                    .url()
+                    .and_then(|url| url.to_file_path().ok())
+                    .map(|path| std::fs::write(&path, contents));
+                match written {
+                    Some(Ok(())) => cosmic::Action::App(Message::ExportFinished(
+                        crate::fl!("export-success"),
+                    )),
+                    _ => cosmic::Action::App(Message::ExportFinished(crate::fl!(
+                        "export-failure"
+                    ))),
+                }
+            }
+            // Cancelled or failed dialog: stay silent.
+            Err(_) => cosmic::Action::App(Message::Tick),
+        }
+    })
+}

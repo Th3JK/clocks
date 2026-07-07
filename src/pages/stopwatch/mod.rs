@@ -19,4 +19,7 @@ pub enum Message {
     ResumeFromHistory(u32),
     ClearHistory,
     OpenHistory,
+    // Export
+    ExportAllHistory,
+    ExportRecord(u32),
 }
