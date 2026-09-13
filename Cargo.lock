@@ -782,6 +782,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "chrono-tz",
+ "cosmic-config",
  "futures-util",
  "i18n-embed",
  "i18n-embed-fl",

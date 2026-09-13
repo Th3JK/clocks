@@ -8,7 +8,7 @@
 
 use crate::fl;
 use chrono::Timelike;
-use cosmic::cosmic_config::ConfigGet;
+use cosmic_config::ConfigGet;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -55,7 +55,7 @@ fn system_use_12h() -> bool {
 
 /// `military_time` from `com.system76.CosmicAppletTime`. `true` means 24-hour.
 fn cosmic_military_time() -> Option<bool> {
-    let config = cosmic::cosmic_config::Config::new("com.system76.CosmicAppletTime", 1).ok()?;
+    let config = cosmic_config::Config::new("com.system76.CosmicAppletTime", 1).ok()?;
     config.get::<bool>("military_time").ok()
 }
 

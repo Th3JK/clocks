@@ -18,6 +18,10 @@ name = "clocks"
 path = "src/main.rs"
 
 [dependencies]
+# Reached directly rather than through `cosmic::cosmic_config`, so the config
+# schema does not depend on libcosmic's widget layer. Must stay on the same rev
+# as libcosmic below, or the two resolve to different `Config` types.
+cosmic-config = { git = "https://github.com/pop-os/libcosmic.git", rev = "7e82198ab1aba712640b0167e58ad37bf03012ca" }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
 futures-util = "0.3.31"

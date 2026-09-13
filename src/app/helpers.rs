@@ -10,7 +10,7 @@ use crate::fl;
 use crate::pages::{
     Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
 };
-use cosmic::cosmic_config::CosmicConfigEntry;
+use cosmic_config::CosmicConfigEntry;
 use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Timelike, Utc};
 use cosmic::prelude::*;
 use cosmic::widget::{self, toaster};

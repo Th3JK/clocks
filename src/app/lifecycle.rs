@@ -20,7 +20,7 @@ use crate::pages::{
     ContextPage, Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
 };
 use cosmic::app::context_drawer;
-use cosmic::cosmic_config::{self, CosmicConfigEntry};
+use cosmic_config::CosmicConfigEntry;
 use cosmic::iced::Length;
 use cosmic::iced::Subscription;
 use cosmic::iced::event::listen_raw;

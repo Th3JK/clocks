@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use chrono_tz::Tz;
-use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
+use cosmic_config::{CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]

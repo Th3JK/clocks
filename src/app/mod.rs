@@ -9,7 +9,6 @@ mod subscriptions;
 use crate::config::Config;
 use crate::pages::ContextPage;
 use crate::pages::{alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks};
-use cosmic::cosmic_config;
 use cosmic::widget::{about::About, menu, nav_bar, toaster};
 use std::collections::HashMap;
 use std::sync::Arc;
