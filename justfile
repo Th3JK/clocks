@@ -89,16 +89,19 @@ install-local:
 
 # Register the daemon for the current user: D-Bus activation plus autostart at
 # login, both pointing at the built binary rather than an installed prefix.
-install-daemon-local: build-release
+# Defaults to the debug binary, since that is what `cargo run` produces while
+# iterating. Pass `release` once you want to test what actually ships.
+install-daemon-local profile='debug':
+    cargo build {{ if profile == 'release' { '--release' } else { '' } }} --bin {{daemon-name}}
     mkdir -p {{ local-data-dir / 'dbus-1' / 'services' }}
     printf '[D-BUS Service]\nName=dev.th3jk.clocks.Daemon\nExec=%s\n' \
-        {{ cargo-target-dir / 'release' / daemon-name }} \
+        {{ cargo-target-dir / profile / daemon-name }} \
         > {{ local-data-dir / 'dbus-1' / 'services' / (appid + '.Daemon.service') }}
     mkdir -p {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' }}
     printf '[Desktop Entry]\nType=Application\nName=Clocks alarms\nExec=%s\nTerminal=false\nNoDisplay=true\n' \
-        {{ cargo-target-dir / 'release' / daemon-name }} \
+        {{ cargo-target-dir / profile / daemon-name }} \
         > {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' / (appid + '.Daemon.desktop') }}
-    @echo "Daemon registered. Start it now with: {{ cargo-target-dir / 'release' / daemon-name }} &"
+    @echo "Registered. D-Bus will now start {{ cargo-target-dir / profile / daemon-name }} on demand."
 
 # Run the application for testing purposes
 run *args: install-local

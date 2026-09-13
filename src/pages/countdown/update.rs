@@ -174,6 +174,34 @@ impl CountdownState {
             Message::ToggleEditMode => self.edit_mode = !self.edit_mode,
             Message::Focus(id) => self.focused_id = Some(id),
             Message::Unfocus => self.focused_id = None,
+            Message::StartDrag(index) => {
+                self.pre_drag_order = self.events.iter().map(|e| e.id).collect();
+                self.dragging_index = Some(index);
+            }
+            Message::Reorder(from, to) => {
+                if from < self.events.len() && to <= self.events.len() && from != to {
+                    let item = self.events.remove(from);
+                    let insert_at = if to > from { to - 1 } else { to };
+                    let insert_at = insert_at.min(self.events.len());
+                    self.events.insert(insert_at, item);
+                    self.dragging_index = Some(insert_at);
+                }
+            }
+            Message::FinishDrag => {
+                self.dragging_index = None;
+                self.pre_drag_order.clear();
+            }
+            Message::CancelDrag => {
+                // Restore by id rather than index: the list has already been
+                // mutated in place by the Reorder messages seen so far.
+                if !self.pre_drag_order.is_empty() {
+                    let order = std::mem::take(&mut self.pre_drag_order);
+                    self.events.sort_by_key(|e| {
+                        order.iter().position(|&id| id == e.id).unwrap_or(usize::MAX)
+                    });
+                }
+                self.dragging_index = None;
+            }
         }
 
         notifications

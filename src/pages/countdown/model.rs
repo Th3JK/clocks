@@ -168,6 +168,10 @@ pub struct CountdownState {
     pub edit_mode: bool,
     /// Event shown full-page in focus mode. Session-only, not persisted.
     pub focused_id: Option<u32>,
+    /// Index being dragged in edit mode, or `None`.
+    pub dragging_index: Option<usize>,
+    /// Event ids in their pre-drag order, so a cancelled drag can restore it.
+    pub pre_drag_order: Vec<u32>,
     /// Wall-clock second the tick last did real work, so the 100 ms global tick
     /// doesn't redo date arithmetic ten times a second.
     pub last_check: Option<DateTime<Local>>,
@@ -207,6 +211,8 @@ impl Default for CountdownState {
             edit_reminders: vec![Reminder::OneHour],
             edit_mode: false,
             focused_id: None,
+            dragging_index: None,
+            pre_drag_order: Vec::new(),
             last_check: None,
         }
     }

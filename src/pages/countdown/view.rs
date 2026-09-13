@@ -5,6 +5,7 @@
 
 use super::Message;
 use super::model::*;
+use crate::components::reorder_list::ReorderList;
 use crate::components::{TimeUnit, sound_selector_view, time_picker_row};
 use crate::fl;
 use chrono::Local;
@@ -32,6 +33,9 @@ impl CountdownState {
             && let Some(event) = self.events.iter().find(|e| e.id == id)
         {
             return self.focus_view(event, use_12h);
+        }
+        if self.edit_mode {
+            return self.edit_mode_view(use_12h);
         }
         self.card_grid_view(use_12h)
     }
@@ -118,6 +122,154 @@ impl CountdownState {
             )
             .align_x(Alignment::Center)
             .width(Length::Fill),
+        );
+
+        col.into()
+    }
+
+    /// Edit mode: a vertical, drag-reorderable list rather than the card grid.
+    ///
+    /// The layout change is required, not cosmetic. `ReorderList` hit-tests by
+    /// dividing its own bounds evenly between items, so it needs uniform row
+    /// heights and `space_xxs` column spacing -- a `flex_row` grid cannot give
+    /// it either. This works at all only because the page is in
+    /// `Application::view()`; drag inside a context drawer is silently inert.
+    fn edit_mode_view(&self, use_12h: bool) -> Element<'_, Message> {
+        let cosmic::cosmic_theme::Spacing {
+            space_xxs,
+            space_xs,
+            space_xxxs,
+            ..
+        } = cosmic::theme::spacing();
+
+        let mut col = widget::column::with_capacity(self.events.len() + 2).spacing(space_xxs);
+        col = col.push(self.header_row());
+
+        if self.events.is_empty() {
+            col = col.push(self.empty_state());
+            return col.into();
+        }
+
+        let dragging = self.dragging_index;
+        let rows: Vec<Element<'_, Message>> = self
+            .events
+            .iter()
+            .enumerate()
+            .map(|(i, event)| {
+                // The dragged row collapses to an accent drop-indicator line.
+                if dragging == Some(i) {
+                    return widget::container(widget::Space::new().width(Length::Fill))
+                        .height(Length::Fixed(4.0))
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                            let accent = Color::from(theme.cosmic().accent_color());
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Background::Color(accent)),
+                                border: cosmic::iced::Border {
+                                    radius: 2.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        })))
+                        .into();
+                }
+
+                let id = event.id;
+                let mut info = widget::column::with_capacity(2).spacing(space_xxxs);
+                info = info.push(widget::text::body(&event.label));
+                info = info.push(widget::text::caption(format_target(event.target, use_12h)));
+
+                let content = widget::row::with_capacity(4)
+                    .spacing(space_xs)
+                    .align_y(Alignment::Center)
+                    .push(
+                        widget::icon::from_name("grip-lines-symbolic")
+                            .size(16)
+                            .icon()
+                            .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
+                                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
+                                    color: Some(theme.cosmic().palette.neutral_7.into()),
+                                },
+                            ))),
+                    )
+                    .push(info.width(Length::Fill))
+                    .push(
+                        widget::button::icon(widget::icon::from_name("edit-symbolic"))
+                            .extra_small()
+                            .tooltip(fl!("countdown-edit"))
+                            .on_press(Message::StartEditEvent(id)),
+                    )
+                    .push(
+                        widget::button::icon(widget::icon::from_name("edit-delete-symbolic"))
+                            .extra_small()
+                            .tooltip(fl!("tooltip-delete"))
+                            .on_press(Message::Delete(id)),
+                    );
+
+                widget::container(content)
+                    .padding(8)
+                    .width(Length::Fill)
+                    .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                        let cosmic = theme.cosmic();
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
+                            theme,
+                            &cosmic::theme::Container::Primary,
+                        );
+                        style.border.radius = cosmic.radius_s().into();
+                        style.background =
+                            Some(Color::from(cosmic.bg_component_color()).into());
+                        style
+                    })))
+                    .into()
+            })
+            .collect();
+
+        let count = rows.len();
+        let cards = widget::column::with_children(rows).spacing(space_xxs);
+
+        // The drag icon closure must be 'static, so snapshot the labels.
+        let labels: Vec<String> = self.events.iter().map(|e| e.label.clone()).collect();
+
+        col = col.push(
+            ReorderList::new(cards, count, dragging)
+                .on_start_drag(Message::StartDrag)
+                .on_reorder(|from, to| Message::Reorder(from, to))
+                .on_finish(Message::FinishDrag)
+                .on_cancel(Message::CancelDrag)
+                .drag_icon(move |index, offset| {
+                    let label = labels.get(index).cloned().unwrap_or_default();
+                    let content = widget::row::with_children(vec![
+                        widget::icon::from_name("grip-lines-symbolic")
+                            .size(16)
+                            .icon()
+                            .into(),
+                        widget::text::body(label).width(Length::Fill).into(),
+                    ])
+                    .spacing(space_xs)
+                    .align_y(Alignment::Center);
+
+                    let card: Element<'static, ()> = widget::container(content)
+                        .padding(8)
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                            let accent = Color::from(theme.cosmic().accent_color());
+                            let mut style = cosmic::iced::widget::container::Catalog::style(
+                                theme,
+                                &cosmic::theme::Container::Primary,
+                            );
+                            style.border.radius = theme.cosmic().radius_s().into();
+                            style.border.color = accent;
+                            style.border.width = 2.0;
+                            style.background = Some(
+                                Color::from(theme.cosmic().bg_component_color()).into(),
+                            );
+                            style
+                        })))
+                        .into();
+
+                    (card, cosmic::iced::core::widget::tree::State::None, offset)
+                }),
         );
 
         col.into()
@@ -274,22 +426,6 @@ impl CountdownState {
                 .width(Length::Fill),
         );
 
-        // In edit mode the card stops being a press target, so editing and
-        // deleting get explicit buttons instead.
-        if self.edit_mode {
-            card_col = card_col.push(
-                widget::row::with_capacity(2)
-                    .spacing(spacing.space_xs)
-                    .push(
-                        widget::button::standard(fl!("countdown-edit"))
-                            .on_press(Message::StartEditEvent(id)),
-                    )
-                    .push(
-                        widget::button::destructive(fl!("delete"))
-                            .on_press(Message::Delete(id)),
-                    ),
-            );
-        }
 
         let card = widget::container(card_col)
             .width(Length::Fill)
@@ -306,12 +442,7 @@ impl CountdownState {
             })));
 
         // Pressing a card opens it full-page, matching world clocks and timers.
-        // Suppressed in edit mode so the press target doesn't fight the buttons.
-        if self.edit_mode {
-            card.into()
-        } else {
-            widget::mouse_area(card).on_press(Message::Focus(id)).into()
-        }
+        widget::mouse_area(card).on_press(Message::Focus(id)).into()
     }
 
     /// Create/edit form for the context drawer.

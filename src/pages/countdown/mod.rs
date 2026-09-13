@@ -34,4 +34,9 @@ pub enum Message {
     /// Show one event full-page, as the world clocks and timers do.
     Focus(u32),
     Unfocus,
+    // Drag-to-reorder, edit mode only.
+    StartDrag(usize),
+    Reorder(usize, usize),
+    FinishDrag,
+    CancelDrag,
 }
