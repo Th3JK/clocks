@@ -23,6 +23,7 @@ start = Start
 pause = Pause
 resume = Resume
 reset = Reset
+notification-open = Open Clocks
 dismiss = Dismiss
 snooze = Snooze
 add = Add

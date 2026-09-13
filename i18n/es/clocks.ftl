@@ -23,6 +23,7 @@ start = Iniciar
 pause = Pausar
 resume = Reanudar
 reset = Reiniciar
+notification-open = Abrir Relojes
 dismiss = Descartar
 snooze = Posponer
 add = Añadir

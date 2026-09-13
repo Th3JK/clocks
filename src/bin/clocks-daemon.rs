@@ -35,6 +35,9 @@ struct Daemon {
     config_ctx: Option<cosmic_config::Config>,
     /// Stop flags for the looping alarm audio, keyed by alarm id.
     audio_stops: Mutex<HashMap<u32, Arc<AtomicBool>>>,
+    /// The checkpoint that last reached disk, for deciding when to write again.
+    /// In-memory state advances every tick, so it cannot answer that question.
+    last_persisted: Mutex<Option<chrono::DateTime<chrono::Local>>>,
 }
 
 impl Daemon {
@@ -43,7 +46,9 @@ impl Daemon {
             && let Err(e) = state.write_entry(ctx)
         {
             eprintln!("clocks-daemon: failed to write runtime state: {e:?}");
+            return;
         }
+        *self.last_persisted.lock().expect("checkpoint poisoned") = state.checked_through;
     }
 
     fn definitions(&self) -> Config {
@@ -133,6 +138,12 @@ fn notify(daemon: Arc<Daemon>, alarm_id: u32, label: &str) {
             .summary(&clocks::fl!("notification-alarm"))
             .body(&body)
             .icon("alarm-symbolic")
+            // The "default" key is what makes the notification *body*
+            // activatable. Without it the server emits no ActionInvoked for a
+            // body click -- it just closes the notification, which reads as the
+            // click having dismissed the alarm. Servers conventionally render
+            // "default" as the body rather than a third button.
+            .action("default", &clocks::fl!("notification-open"))
             .action("dismiss", &clocks::fl!("dismiss"))
             .action("snooze", &clocks::fl!("snooze"))
             // Must not time out: a ringing alarm stays until answered.
@@ -148,13 +159,36 @@ fn notify(daemon: Arc<Daemon>, alarm_id: u32, label: &str) {
                 // over the bus anyway.
                 "dismiss" => daemon.answer_dismiss(alarm_id),
                 "snooze" => daemon.answer_snooze(alarm_id),
-                // Closing the notification is not an answer -- the alarm keeps
-                // ringing until its window expires and it auto-snoozes.
+                // Clicking the body opens the app on the Alarm page. The alarm
+                // keeps ringing -- opening is not the same as answering, and the
+                // window has its own Dismiss and Snooze.
+                "default" => open_app_at(clocks::pages::Page::Alarm),
+                // Closing the notification is not an answer either; the alarm
+                // rings on until its window expires and it auto-snoozes.
                 _ => {}
             }),
             Err(e) => eprintln!("clocks-daemon: notification failed: {e}"),
         }
     });
+}
+
+/// Launch the GUI on a given page.
+///
+/// `run_single_instance` in the GUI does the hard part: if a window is already
+/// open this is forwarded to it and the new process exits, so this both opens
+/// and focuses without the daemon needing to know which case it is in.
+fn open_app_at(page: clocks::pages::Page) {
+    // Alongside the daemon first, so a dev build launches its sibling rather
+    // than an installed copy of a different vintage.
+    let sibling = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("clocks")))
+        .filter(|p| p.exists());
+
+    let program = sibling.unwrap_or_else(|| std::path::PathBuf::from("clocks"));
+    if let Err(e) = std::process::Command::new(&program).arg(page.key()).spawn() {
+        eprintln!("clocks-daemon: could not open the app: {e}");
+    }
 }
 
 struct DaemonInterface(Arc<Daemon>);
@@ -236,12 +270,26 @@ fn tick(daemon: &Arc<Daemon>) {
     }
     state.checked_through = Some(now);
 
-    // Only write when something actually changed: the GUI watches this entry,
-    // and a write every second would wake it every second.
-    if state.ringing != before.ringing
+    // Two reasons to write, and they want different cadences.
+    //
+    // Something the GUI renders changed -- write immediately, it is watching.
+    let substantive = state.ringing != before.ringing
         || state.snoozed != before.snoozed
-        || state.consumed_once != before.consumed_once
-    {
+        || state.consumed_once != before.consumed_once;
+
+    // Or the checkpoint has drifted. This has to reach disk or the catch-up
+    // window is wrong after a restart: `since` would fall back to `now` and
+    // anything due while the daemon was down is skipped. Writing it every
+    // second would wake the GUI's watcher every second, so it goes at a
+    // coarser cadence -- well inside the 24h cap, and the worst case is
+    // re-firing an alarm from the last half minute before a crash.
+    let drifted = daemon
+        .last_persisted
+        .lock()
+        .expect("checkpoint poisoned")
+        .is_none_or(|last| now.signed_duration_since(last).num_seconds().abs() >= 30);
+
+    if substantive || drifted {
         daemon.persist(&state);
     }
 }
@@ -289,6 +337,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         state_ctx,
         config_ctx,
         audio_stops: Mutex::new(HashMap::new()),
+        last_persisted: Mutex::new(None),
     });
 
     import_legacy_snoozes(&daemon, &mut state);

@@ -23,6 +23,7 @@ start = Старт
 pause = Пауза
 resume = Продолжить
 reset = Сброс
+notification-open = Открыть Часы
 dismiss = Отключить
 snooze = Отложить
 add = Добавить

@@ -32,7 +32,7 @@ use std::collections::HashMap;
 
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
-    type Flags = ();
+    type Flags = crate::flags::Flags;
     type Message = Message;
 
     const APP_ID: &'static str = "dev.th3jk.clocks";
@@ -47,7 +47,7 @@ impl cosmic::Application for AppModel {
 
     fn init(
         core: cosmic::Core,
-        _flags: Self::Flags,
+        flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         // Populated by `rebuild_nav` once the stored order is known.
         let nav = nav_bar::Model::default();
@@ -154,6 +154,12 @@ impl cosmic::Application for AppModel {
                 eprintln!("clocks: background daemon unavailable: {e}");
             }
         });
+
+        // Launched with a page to show -- e.g. by clicking an alarm
+        // notification while the app was closed.
+        if let Some(page) = flags.page {
+            app.activate_page(page);
+        }
 
         if app.auto_sort_alarms {
             app.sort_alarms();
@@ -1067,6 +1073,23 @@ impl cosmic::Application for AppModel {
             self.save_state();
         }
 
+        Task::none()
+    }
+
+    /// Another `clocks` invocation handed us its arguments instead of starting a
+    /// second window. That is how a notification click reaches an app that was
+    /// already open.
+    fn dbus_activation(
+        &mut self,
+        msg: cosmic::dbus_activation::Message,
+    ) -> Task<cosmic::Action<Self::Message>> {
+        if let cosmic::dbus_activation::Details::ActivateAction { args, .. } = msg.msg
+            && let Some(page) = args.first().and_then(|key| Page::from_key(key))
+        {
+            self.activate_page(page);
+            self.core.window.show_context = false;
+            return self.update_title();
+        }
         Task::none()
     }
 

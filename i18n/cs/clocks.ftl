@@ -23,6 +23,7 @@ start = Spustit
 pause = Pozastavit
 resume = Pokračovat
 reset = Resetovat
+notification-open = Otevřít Hodiny
 dismiss = Zavřít
 snooze = Odložit
 add = Přidat

@@ -13,5 +13,12 @@ fn main() -> cosmic::iced::Result {
             .min_height(180.0),
     );
 
-    cosmic::app::run::<clocks::app::AppModel>(settings, ())
+    // `run_single_instance` rather than `run`: if a window is already open it
+    // forwards these flags to it over D-Bus and exits, so launching
+    // `clocks alarm` from a notification raises the existing window on the
+    // Alarm page instead of opening a second one.
+    cosmic::app::run_single_instance::<clocks::app::AppModel>(
+        settings,
+        clocks::flags::Flags::from_args(),
+    )
 }

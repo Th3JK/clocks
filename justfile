@@ -103,6 +103,16 @@ install-daemon-local profile='debug':
         > {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' / (appid + '.Daemon.desktop') }}
     @echo "Registered. D-Bus will now start {{ absolute_path(cargo-target-dir / profile / daemon-name) }} on demand."
 
+# Rebuild the daemon and restart it.
+#
+# D-Bus activation only starts a daemon when none is running -- it never
+# replaces a live process -- so without the kill you keep testing the previous
+# build and wonder why a fix had no effect.
+restart-daemon profile='debug':
+    cargo build {{ if profile == 'release' { '--release' } else { '' } }} --bin {{daemon-name}}
+    -pkill -f {{daemon-name}}
+    @echo "Daemon stopped. It restarts on demand, or now with: {{ absolute_path(cargo-target-dir / profile / daemon-name) }} &"
+
 # Run the application for testing purposes
 run *args: install-local
     env RUST_BACKTRACE=full cargo run --release {{args}}

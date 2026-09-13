@@ -15,6 +15,7 @@ pub mod app;
 pub mod audio;
 pub mod components;
 pub mod config;
+pub mod flags;
 pub mod i18n;
 pub mod ipc;
 pub mod pages;
