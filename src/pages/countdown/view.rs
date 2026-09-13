@@ -5,7 +5,7 @@
 
 use super::Message;
 use super::model::*;
-use crate::components::{TimeUnit, sound_selector_view, time_picker};
+use crate::components::{TimeUnit, sound_selector_view, time_picker_row};
 use crate::fl;
 use chrono::Local;
 use cosmic::iced::font::Weight;
@@ -226,9 +226,12 @@ impl CountdownState {
         // Bundled glyph rather than a theme name: the nav icon is already this
         // calendar, and unproven `from_name` lookups have silently rendered
         // nothing twice in this app.
+        // No width set: the chip shrink-wraps so the time stepper can sit beside
+        // it. `.width(Length::Fill)` would be ignored anyway — libcosmic's
+        // text-button builder applies the requested width to its inner row and
+        // then wraps that in an outer button left at `Shrink`.
         let date_button = widget::button::standard(date_label)
             .leading_icon(crate::app::bundled_icon(crate::app::COUNTDOWN_ICON))
-            .width(Length::Fill)
             .on_press(Message::ToggleCalendar);
 
         let mut date_field = widget::popover(date_button)
@@ -271,8 +274,6 @@ impl CountdownState {
             );
         }
 
-        col = col.push(date_field);
-
         // Time, reusing the alarm page's vertical stepper.
         let (hour_display, period): (u32, Option<String>) = if use_12h {
             let (h, is_pm) = crate::time_format::to_12h(self.edit_hour);
@@ -280,25 +281,32 @@ impl CountdownState {
         } else {
             (self.edit_hour, None)
         };
-        col = col.push(time_picker(vec![
-            TimeUnit::new(
-                format!("{hour_display:02}"),
-                Message::EditHour((self.edit_hour + 1) % 24),
-                Message::EditHour((self.edit_hour + 23) % 24),
-            ),
-            TimeUnit::new(
-                format!("{:02}", self.edit_minute),
-                Message::EditMinute((self.edit_minute + 1) % 60),
-                Message::EditMinute((self.edit_minute + 59) % 60),
-            ),
-        ]));
-        if let Some(p) = period {
-            col = col.push(
-                widget::container(widget::text::body(p))
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill),
-            );
-        }
+
+        // Date and time share one line, aligned to the left edge of the form
+        // like every other field. `align_y` is about the cross axis: the
+        // stepper's centre line is its digits, so this puts the date chip level
+        // with them rather than with the increment buttons. `time_picker_row`
+        // rather than `time_picker` because the latter's full-width wrapper
+        // would centre the digits inside the row's leftover space.
+        let when_row = widget::row::with_capacity(3)
+            .spacing(spacing)
+            .align_y(Alignment::Center)
+            .push(date_field)
+            .push(time_picker_row(vec![
+                TimeUnit::new(
+                    format!("{hour_display:02}"),
+                    Message::EditHour((self.edit_hour + 1) % 24),
+                    Message::EditHour((self.edit_hour + 23) % 24),
+                ),
+                TimeUnit::new(
+                    format!("{:02}", self.edit_minute),
+                    Message::EditMinute((self.edit_minute + 1) % 60),
+                    Message::EditMinute((self.edit_minute + 59) % 60),
+                ),
+            ]))
+            .push_maybe(period.map(|p| widget::text::body(p)));
+
+        col = col.push(when_row);
 
         col = col.push(widget::divider::horizontal::default());
 
