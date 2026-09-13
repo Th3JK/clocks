@@ -206,6 +206,10 @@ pub struct SavedTimer {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedPomodoro {
+    /// Stable identity. The daemon references a running session by id, so
+    /// deriving it from list position would re-point a live run at a different
+    /// pomodoro as soon as the list is reordered.
+    pub id: u32,
     pub label: String,
     pub work_minutes: u32,
     pub short_break_minutes: u32,

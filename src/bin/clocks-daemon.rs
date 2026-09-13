@@ -13,7 +13,7 @@
 //! - An autostart entry, so it is running before the GUI ever opens.
 
 use clocks::config::Config;
-use clocks::runtime::{RingingRecord, RuntimeState, TimerRun};
+use clocks::runtime::{PomodoroRun, RingingRecord, RuntimeState, SessionKind, TimerRun};
 use clocks::{audio, ipc, scheduler};
 use cosmic_config::CosmicConfigEntry;
 use std::collections::HashMap;
@@ -163,6 +163,77 @@ impl Daemon {
         self.update_timers(|runs| runs.retain(|t| t.timer_id != timer_id));
     }
 
+    fn pomodoro_def(&self, timer_id: u32) -> Option<clocks::config::SavedPomodoro> {
+        self.definitions()
+            .pomodoros
+            .into_iter()
+            .find(|p| p.id == timer_id)
+    }
+
+    fn update_pomodoro(&self, f: impl FnOnce(&mut Vec<PomodoroRun>)) {
+        let mut state = self.state.lock().expect("runtime state poisoned");
+        f(&mut state.pomodoro);
+        self.persist(&state);
+    }
+
+    fn pomodoro_start(&self, timer_id: u32) {
+        let Some(def) = self.pomodoro_def(timer_id) else {
+            return;
+        };
+        let secs = u64::from(def.work_minutes) * 60;
+        let now = chrono::Local::now();
+        self.update_pomodoro(|runs| {
+            runs.retain(|p| p.timer_id != timer_id);
+            runs.push(PomodoroRun {
+                timer_id,
+                session: SessionKind::Work,
+                session_number: 1,
+                deadline: Some(now + chrono::Duration::seconds(secs as i64)),
+                remaining_secs: secs,
+                completed_work_sessions: 0,
+                unrecorded_focus_secs: 0,
+            });
+        });
+    }
+
+    fn pomodoro_pause(&self, timer_id: u32) {
+        let now = chrono::Local::now();
+        self.update_pomodoro(|runs| {
+            if let Some(run) = runs.iter_mut().find(|p| p.timer_id == timer_id) {
+                run.remaining_secs = run.remaining_secs(now);
+                run.deadline = None;
+            }
+        });
+    }
+
+    fn pomodoro_resume(&self, timer_id: u32) {
+        let now = chrono::Local::now();
+        self.update_pomodoro(|runs| {
+            if let Some(run) = runs.iter_mut().find(|p| p.timer_id == timer_id)
+                && run.deadline.is_none()
+            {
+                run.deadline = Some(now + chrono::Duration::seconds(run.remaining_secs as i64));
+            }
+        });
+    }
+
+    /// Jump straight to the next phase without waiting it out.
+    fn pomodoro_skip(&self, timer_id: u32) {
+        let Some(def) = self.pomodoro_def(timer_id) else {
+            return;
+        };
+        let now = chrono::Local::now();
+        self.update_pomodoro(|runs| {
+            if let Some(run) = runs.iter_mut().find(|p| p.timer_id == timer_id) {
+                advance_session(run, &def, now);
+            }
+        });
+    }
+
+    fn pomodoro_reset(&self, timer_id: u32) {
+        self.update_pomodoro(|runs| runs.retain(|p| p.timer_id != timer_id));
+    }
+
     /// Ring an alarm: notification with actions, looping audio, recorded state.
     /// Takes `&Arc<Self>` so the notification thread can hold the daemon and
     /// answer Dismiss/Snooze without a bus round-trip.
@@ -250,6 +321,46 @@ fn open_app_at(page: clocks::pages::Page) {
     }
 }
 
+/// Move a pomodoro to its next phase and re-arm the deadline.
+///
+/// Mirrors `PomodoroTimer::advance_session`, which stays in the GUI for the
+/// case where it is driving the display. Work goes to a long break every fourth
+/// completed work session and a short break otherwise; a break goes back to
+/// work and bumps the session number.
+///
+/// Returns the label for the phase just entered, for the notification body.
+fn advance_session(
+    run: &mut PomodoroRun,
+    def: &clocks::config::SavedPomodoro,
+    now: chrono::DateTime<chrono::Local>,
+) -> SessionKind {
+    let minutes = match run.session {
+        SessionKind::Work => {
+            run.completed_work_sessions += 1;
+            // Banked for the GUI to fold into daily stats, which the daemon
+            // cannot write.
+            run.unrecorded_focus_secs += u64::from(def.work_minutes) * 60;
+            if run.completed_work_sessions % 4 == 0 {
+                run.session = SessionKind::LongBreak;
+                def.long_break_minutes
+            } else {
+                run.session = SessionKind::ShortBreak;
+                def.short_break_minutes
+            }
+        }
+        SessionKind::ShortBreak | SessionKind::LongBreak => {
+            run.session_number += 1;
+            run.session = SessionKind::Work;
+            def.work_minutes
+        }
+    };
+
+    let secs = u64::from(minutes) * 60;
+    run.remaining_secs = secs;
+    run.deadline = Some(now + chrono::Duration::seconds(secs as i64));
+    run.session
+}
+
 /// Post a notification whose body opens the app on `page`.
 ///
 /// For things that have simply happened and need no answer -- a finished timer,
@@ -306,6 +417,35 @@ impl DaemonInterface {
 
     fn timer_reset(&self, timer_id: u32) {
         self.0.timer_reset(timer_id);
+    }
+
+    fn pomodoro_start(&self, timer_id: u32) {
+        self.0.pomodoro_start(timer_id);
+    }
+
+    fn pomodoro_pause(&self, timer_id: u32) {
+        self.0.pomodoro_pause(timer_id);
+    }
+
+    fn pomodoro_resume(&self, timer_id: u32) {
+        self.0.pomodoro_resume(timer_id);
+    }
+
+    fn pomodoro_skip(&self, timer_id: u32) {
+        self.0.pomodoro_skip(timer_id);
+    }
+
+    fn pomodoro_reset(&self, timer_id: u32) {
+        self.0.pomodoro_reset(timer_id);
+    }
+
+    /// The GUI has folded `secs` into daily stats; stop banking them.
+    fn pomodoro_focus_recorded(&self, timer_id: u32, secs: u64) {
+        self.0.update_pomodoro(|runs| {
+            if let Some(run) = runs.iter_mut().find(|p| p.timer_id == timer_id) {
+                run.unrecorded_focus_secs = run.unrecorded_focus_secs.saturating_sub(secs);
+            }
+        });
     }
 
     /// Nudge to re-read definitions. The scheduler reads them every tick, so
@@ -394,6 +534,39 @@ fn tick(daemon: &Arc<Daemon>) {
         audio::play_sound(&def.sound);
     }
 
+    // Pomodoro. Advancing the cycle here is what lets a session run unattended
+    // -- the page's own advance_session only runs while the window is open.
+    let pomodoro_defs = config.pomodoros.clone();
+    let mut advanced: Vec<(String, String, SessionKind, SessionKind)> = Vec::new();
+    state.pomodoro.retain_mut(|run| {
+        let Some(deadline) = run.deadline else {
+            return true;
+        };
+        if deadline > now {
+            return true;
+        }
+        let Some(def) = pomodoro_defs.iter().find(|d| d.id == run.timer_id) else {
+            return false;
+        };
+        let previous = run.session;
+        let next = advance_session(run, def, now);
+        advanced.push((def.label.clone(), def.sound.clone(), previous, next));
+        true
+    });
+    for (label, sound, previous, next) in advanced {
+        notify_opening(
+            clocks::pages::Page::Pomodoro,
+            clocks::fl!("notification-pomodoro"),
+            clocks::fl!(
+                "pomodoro-transition",
+                label = label,
+                prev = previous.display_name(),
+                next = next.display_name()
+            ),
+        );
+        audio::play_sound(&sound);
+    }
+
     // Switching a spent one-shot back on in the GUI re-arms it. The GUI cannot
     // write here, so the daemon infers it from the definition being enabled.
     state
@@ -420,7 +593,8 @@ fn tick(daemon: &Arc<Daemon>) {
     let substantive = state.ringing != before.ringing
         || state.snoozed != before.snoozed
         || state.consumed_once != before.consumed_once
-        || state.timers != before.timers;
+        || state.timers != before.timers
+        || state.pomodoro != before.pomodoro;
 
     // Or the checkpoint has drifted. This has to reach disk or the catch-up
     // window is wrong after a restart: `since` would fall back to `now` and

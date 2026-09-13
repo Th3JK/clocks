@@ -60,6 +60,41 @@ pub struct TimerRun {
     pub completed: u32,
 }
 
+/// Which phase of the pomodoro cycle a run is in.
+///
+/// Mirrors `pages::pomodoro::SessionType`, which is not serialisable and lives
+/// behind the widget layer -- the same split as `SavedRepeatMode` and
+/// `RepeatMode`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionKind {
+    Work,
+    ShortBreak,
+    LongBreak,
+}
+
+/// A pomodoro the daemon is running.
+///
+/// Unlike a timer this does not simply end: on expiry it advances to the next
+/// phase, which is why the cycle has to live here rather than in the GUI.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PomodoroRun {
+    pub timer_id: u32,
+    pub session: SessionKind,
+    pub session_number: u32,
+    /// Expiry while running; `None` when paused.
+    pub deadline: Option<chrono::DateTime<chrono::Local>>,
+    /// Authoritative only while paused.
+    pub remaining_secs: u64,
+    pub completed_work_sessions: u32,
+    /// Work seconds finished but not yet folded into `Config.pomodoro_stats`.
+    ///
+    /// Daily stats are a GUI-owned config entry, so the daemon cannot write
+    /// them. It banks the total here and the GUI records it on next sight,
+    /// clearing the counter -- late rather than never, and still one writer per
+    /// entry.
+    pub unrecorded_focus_secs: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, CosmicConfigEntry)]
 #[version = 1]
 pub struct RuntimeState {
@@ -93,6 +128,10 @@ pub struct RuntimeState {
     /// is only the running state, looked up by `timer_id`.
     #[serde(default)]
     pub timers: Vec<TimerRun>,
+
+    /// Pomodoros the daemon is running.
+    #[serde(default)]
+    pub pomodoro: Vec<PomodoroRun>,
 }
 
 impl Default for RuntimeState {
@@ -103,6 +142,7 @@ impl Default for RuntimeState {
             consumed_once: Vec::new(),
             checked_through: None,
             timers: Vec::new(),
+            pomodoro: Vec::new(),
         }
     }
 }
@@ -132,11 +172,47 @@ impl RuntimeState {
     pub fn timer(&self, timer_id: u32) -> Option<&TimerRun> {
         self.timers.iter().find(|t| t.timer_id == timer_id)
     }
+
+    pub fn pomodoro(&self, timer_id: u32) -> Option<&PomodoroRun> {
+        self.pomodoro.iter().find(|p| p.timer_id == timer_id)
+    }
 }
 
 impl TimerRun {
     /// Seconds left, from the deadline while running and from the stored
     /// remainder while paused. Saturates at zero rather than going negative.
+    #[must_use]
+    pub fn remaining_secs(&self, now: chrono::DateTime<chrono::Local>) -> u64 {
+        match self.deadline {
+            Some(deadline) => deadline
+                .signed_duration_since(now)
+                .num_seconds()
+                .max(0)
+                .unsigned_abs(),
+            None => self.remaining_secs,
+        }
+    }
+
+    #[must_use]
+    pub fn is_running(&self) -> bool {
+        self.deadline.is_some()
+    }
+}
+
+impl SessionKind {
+    /// Same strings the pomodoro page uses, so a notification and the window
+    /// name the phase identically.
+    #[must_use]
+    pub fn display_name(self) -> String {
+        match self {
+            SessionKind::Work => crate::fl!("session-work"),
+            SessionKind::ShortBreak => crate::fl!("session-short-break"),
+            SessionKind::LongBreak => crate::fl!("session-long-break"),
+        }
+    }
+}
+
+impl PomodoroRun {
     #[must_use]
     pub fn remaining_secs(&self, now: chrono::DateTime<chrono::Local>) -> u64 {
         match self.deadline {

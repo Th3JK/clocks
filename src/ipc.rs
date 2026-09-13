@@ -63,6 +63,43 @@ pub fn timer_reset(timer_id: u32) -> Result<(), zbus::Error> {
     call_with_id("TimerReset", timer_id)
 }
 
+/// Start a pomodoro from the beginning of a work session.
+pub fn pomodoro_start(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("PomodoroStart", timer_id)
+}
+
+pub fn pomodoro_pause(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("PomodoroPause", timer_id)
+}
+
+pub fn pomodoro_resume(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("PomodoroResume", timer_id)
+}
+
+/// Jump to the next phase without waiting it out.
+pub fn pomodoro_skip(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("PomodoroSkip", timer_id)
+}
+
+pub fn pomodoro_reset(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("PomodoroReset", timer_id)
+}
+
+/// Tell the daemon the GUI has written `secs` into daily stats, so it can stop
+/// banking them. Daily stats live in the GUI-owned config entry, so this is the
+/// handshake that keeps a single writer per entry.
+pub fn pomodoro_focus_recorded(timer_id: u32, secs: u64) -> Result<(), zbus::Error> {
+    let connection = zbus::blocking::Connection::session()?;
+    connection.call_method(
+        Some(DAEMON_BUS_NAME),
+        DAEMON_PATH,
+        Some(DAEMON_INTERFACE),
+        "PomodoroFocusRecorded",
+        &(timer_id, secs),
+    )?;
+    Ok(())
+}
+
 /// Ask the daemon to re-read alarm definitions.
 ///
 /// The daemon watches the config itself, so this is only a nudge for the case

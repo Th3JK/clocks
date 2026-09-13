@@ -87,6 +87,7 @@ pub fn build_config_from_state(
         .timers
         .iter()
         .map(|p| SavedPomodoro {
+            id: p.id,
             label: p.label.clone(),
             work_minutes: p.work_minutes,
             short_break_minutes: p.short_break_minutes,
@@ -478,9 +479,9 @@ pub fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
 
     if !config.pomodoros.is_empty() {
         state.timers.clear();
-        for (i, p) in config.pomodoros.iter().enumerate() {
+        for p in &config.pomodoros {
             let mut timer = pomodoro::PomodoroTimer::from_config(
-                i as u32,
+                p.id,
                 p.label.clone(),
                 p.work_minutes,
                 p.short_break_minutes,
@@ -489,7 +490,9 @@ pub fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
             timer.sound = p.sound.clone();
             state.timers.push(timer);
         }
-        state.next_id = config.pomodoros.len() as u32;
+        // Highest id in use, not the count: positional numbering collides with
+        // a live id once anything has been deleted.
+        state.next_id = state.timers.iter().map(|t| t.id).max().unwrap_or(0) + 1;
     }
 
     state.daily_stats = config

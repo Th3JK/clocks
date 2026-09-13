@@ -37,12 +37,15 @@ impl AppModel {
             }
         }
 
-        // Pomodoro tick + session transition notifications
-        if self.pomodoro.is_running() {
-            let notifications = self.pomodoro.update(pomodoro::Message::Tick);
-            for (msg, sound) in notifications {
-                audio::send_notification(&fl!("notification-pomodoro"), &msg);
-                audio::play_sound(&sound);
+        // Pomodoro: display only, like timers. The daemon advances the session
+        // cycle and fires the notification.
+        if !self.runtime.pomodoro.is_empty() {
+            let now = Local::now();
+            for entry in &mut self.pomodoro.timers {
+                if let Some(run) = self.runtime.pomodoro(entry.id) {
+                    entry.is_running = run.is_running();
+                    entry.remaining = std::time::Duration::from_secs(run.remaining_secs(now));
+                }
             }
         }
 

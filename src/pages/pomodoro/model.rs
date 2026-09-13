@@ -194,7 +194,7 @@ impl PomodoroState {
 
     /// Record a completed work session of `secs` into today's stats, then prune
     /// entries older than ~90 days.
-    pub(super) fn record_completed_work(&mut self, secs: u64) {
+    pub fn record_completed_work(&mut self, secs: u64) {
         let today = chrono::Local::now().date_naive();
         if let Some(entry) = self.daily_stats.iter_mut().find(|d| d.date == today) {
             entry.focus_secs += secs;

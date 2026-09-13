@@ -631,13 +631,15 @@ impl cosmic::Application for AppModel {
 
             Message::Pomodoro(ref msg) => match msg {
                 pomodoro::Message::Delete(id) => {
+                    let id = *id;
                     if self.confirm_delete_pomodoro && self.pending_destructive_action.is_none() {
-                        let id = *id;
                         self.pending_destructive_action =
                             Some(DestructiveAction::DeletePomodoro(id));
                         self.confirm_dialog_dont_show_again = false;
                         return Task::none();
                     }
+                    // Stop it running before the definition it refers to is gone.
+                    daemon_call(move || crate::ipc::pomodoro_reset(id));
                     self.pomodoro.update(msg.clone());
                 }
                 pomodoro::Message::OpenSettings | pomodoro::Message::StartEditPomodoro(_) => {
@@ -668,12 +670,32 @@ impl cosmic::Application for AppModel {
                     // previously fell through to the catch-all and left it open.
                     self.core.window.show_context = false;
                 }
-                pomodoro::Message::Start(id)
-                | pomodoro::Message::Pause(id)
-                | pomodoro::Message::Resume(id)
-                | pomodoro::Message::Skip(id) => {
-                    self.active_pomodoro_id = Some(*id);
-                    self.pomodoro.update(msg.clone());
+                // The daemon owns the running session, so these are requests.
+                // It advances work -> break -> work on its own, which is what
+                // keeps a pomodoro cycling with the window closed.
+                pomodoro::Message::Start(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_start(id));
+                }
+                pomodoro::Message::Pause(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_pause(id));
+                }
+                pomodoro::Message::Resume(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_resume(id));
+                }
+                pomodoro::Message::Skip(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_skip(id));
+                }
+                pomodoro::Message::Reset(id) => {
+                    let id = *id;
+                    daemon_call(move || crate::ipc::pomodoro_reset(id));
                 }
                 pomodoro::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Pomodoro);
@@ -934,6 +956,61 @@ impl cosmic::Application for AppModel {
                         }
                     }
                 }
+                for entry in &mut self.pomodoro.timers {
+                    match runtime.pomodoro(entry.id) {
+                        Some(run) => {
+                            entry.is_running = run.is_running();
+                            entry.remaining =
+                                std::time::Duration::from_secs(run.remaining_secs(now));
+                            entry.session_type = match run.session {
+                                crate::runtime::SessionKind::Work => {
+                                    pomodoro::SessionType::Work
+                                }
+                                crate::runtime::SessionKind::ShortBreak => {
+                                    pomodoro::SessionType::ShortBreak
+                                }
+                                crate::runtime::SessionKind::LongBreak => {
+                                    pomodoro::SessionType::LongBreak
+                                }
+                            };
+                            entry.session_number = run.session_number;
+                            entry.completed_work_sessions = run.completed_work_sessions;
+                        }
+                        // No run: either never started, or reset. Restore the
+                        // opening state -- clearing only `is_running` would
+                        // leave a reset pomodoro frozen mid-session.
+                        //
+                        // Field-wise rather than rebuilding the entry, so the
+                        // label, durations and custom sound survive.
+                        None => {
+                            let work = std::time::Duration::from_secs(
+                                u64::from(entry.work_minutes) * 60,
+                            );
+                            entry.session_number = 1;
+                            entry.session_type = pomodoro::SessionType::Work;
+                            entry.remaining = work;
+                            entry.started_remaining = work;
+                            entry.is_running = false;
+                            entry.start_instant = None;
+                            entry.completed_work_sessions = 0;
+                            entry.total_focused_secs = 0;
+                        }
+                    }
+                }
+
+                // Daily stats are ours to write, so fold in whatever the daemon
+                // banked while we were closed and tell it to clear the counter.
+                let banked: Vec<(u32, u64)> = runtime
+                    .pomodoro
+                    .iter()
+                    .filter(|p| p.unrecorded_focus_secs > 0)
+                    .map(|p| (p.timer_id, p.unrecorded_focus_secs))
+                    .collect();
+                for (timer_id, secs) in banked {
+                    self.pomodoro.record_completed_work(secs);
+                    daemon_call(move || crate::ipc::pomodoro_focus_recorded(timer_id, secs));
+                }
+
                 self.runtime = runtime.clone();
             }
 
@@ -1035,6 +1112,7 @@ impl cosmic::Application for AppModel {
                         self.world_clocks.update(world_clocks::Message::RemoveClock(id));
                     }
                     Some(DestructiveAction::DeletePomodoro(id)) => {
+                        daemon_call(move || crate::ipc::pomodoro_reset(id));
                         self.pomodoro.update(pomodoro::Message::Delete(id));
                     }
                     Some(DestructiveAction::ClearStopwatchHistory) => {
