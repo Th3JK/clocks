@@ -327,7 +327,7 @@ impl AppModel {
             }
             QuickAction::Navigate(page) => fl!(
                 "palette-preview-navigate",
-                page = self.page_title(*page)
+                page = super::helpers::page_title(*page)
             ),
             // Launchers carry only an id, so the label is looked up here — a row
             // should read "Start Morning HIIT", not "Start workout 3".
@@ -364,21 +364,6 @@ impl AppModel {
         }
     }
 
-    /// The nav label for a page, so previews match the sidebar.
-    fn page_title(&self, page: crate::pages::Page) -> String {
-        use crate::pages::Page;
-        match page {
-            Page::WorldClocks => fl!("nav-world-clocks"),
-            Page::Stopwatch => fl!("nav-stopwatch"),
-            Page::Alarm => fl!("nav-alarm"),
-            Page::Timer => fl!("nav-timer"),
-            Page::Pomodoro => fl!("nav-pomodoro"),
-            Page::Chess => fl!("nav-chess"),
-            Page::Workout => fl!("nav-workout"),
-            Page::Countdown => fl!("nav-countdown"),
-        }
-    }
-
     pub(super) fn shortcuts_dialog_view(&self) -> Element<'_, Message> {
         let spacing = 10;
         let mut col = widget::column::with_capacity(26).spacing(spacing);
@@ -405,16 +390,37 @@ impl AppModel {
 
         col = col.push(widget::divider::horizontal::default());
 
-        // Tab shortcuts
+        // Tab shortcuts, built from the live sidebar rather than a fixed list:
+        // `NavigateTo` activates by *position*, so hiding or moving a page
+        // renumbers these, and a hardcoded listing would misreport them.
+        //
+        // `static`, not `const`: `shortcut_row` borrows the slice for the
+        // lifetime of the element it returns, and indexing a `const` by a
+        // runtime value materialises a temporary that dies at end of statement.
+        static ALT_KEYS: [[&str; 2]; 8] = [
+            ["Alt", "1"],
+            ["Alt", "2"],
+            ["Alt", "3"],
+            ["Alt", "4"],
+            ["Alt", "5"],
+            ["Alt", "6"],
+            ["Alt", "7"],
+            ["Alt", "8"],
+        ];
+
         col = col.push(widget::text::title4(fl!("shortcuts-tabs")));
-        col = col.push(Self::shortcut_row(fl!("nav-world-clocks"), &["Alt", "1"]));
-        col = col.push(Self::shortcut_row(fl!("nav-stopwatch"), &["Alt", "2"]));
-        col = col.push(Self::shortcut_row(fl!("nav-alarm"), &["Alt", "3"]));
-        col = col.push(Self::shortcut_row(fl!("nav-timer"), &["Alt", "4"]));
-        col = col.push(Self::shortcut_row(fl!("nav-pomodoro"), &["Alt", "5"]));
-        col = col.push(Self::shortcut_row(fl!("nav-chess"), &["Alt", "6"]));
-        col = col.push(Self::shortcut_row(fl!("nav-workout"), &["Alt", "7"]));
-        col = col.push(Self::shortcut_row(fl!("nav-countdown"), &["Alt", "8"]));
+        for (position, page) in self
+            .nav_order
+            .iter()
+            .filter(|p| !self.nav_hidden.contains(p))
+            .take(ALT_KEYS.len())
+            .enumerate()
+        {
+            col = col.push(Self::shortcut_row(
+                super::helpers::page_title(*page),
+                &ALT_KEYS[position],
+            ));
+        }
 
         col = col.push(widget::divider::horizontal::default());
 
