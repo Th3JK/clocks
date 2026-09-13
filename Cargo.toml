@@ -6,6 +6,17 @@ license = "MIT"
 description = "A clocks application for the COSMIC desktop"
 repository = "https://github.com/th3jk/clocks"
 
+# Both binaries build from the same library, so the daemon shares the config
+# schema, page models, audio and i18n with the GUI rather than reimplementing
+# them.
+[lib]
+name = "clocks"
+path = "src/lib.rs"
+
+[[bin]]
+name = "clocks"
+path = "src/main.rs"
+
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }

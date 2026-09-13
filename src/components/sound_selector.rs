@@ -1,22 +1,8 @@
 // SPDX-License-Identifier: MIT
 
+use crate::sounds::{sound_option_index, SOUND_OPTIONS};
 use cosmic::widget;
 use std::borrow::Cow;
-
-/// Available notification sounds (built-in options + "Custom..." at the end)
-pub const SOUND_OPTIONS: &[&str] = &[
-    "Bell",
-    "Chime",
-    "Alert",
-    "Gentle",
-    "Custom...",
-];
-
-/// Find the dropdown index for a given sound name.
-/// Returns the index in SOUND_OPTIONS, or None if it's a custom path.
-pub fn sound_option_index(current: &str) -> Option<usize> {
-    SOUND_OPTIONS.iter().position(|&s| s == current)
-}
 
 /// Build a sound selector dropdown widget.
 /// `on_select` is called with the sound name (for built-in) or `on_custom` for custom file browsing.

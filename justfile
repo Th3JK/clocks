@@ -24,6 +24,7 @@ icon-svg := appid + '.svg'
 appdata-src := 'resources' / 'app.metainfo.xml'
 desktop-src := 'resources' / 'app.desktop'
 icon-svg-src := 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg'
+audio-src := 'resources' / 'audio'
 
 # Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
@@ -32,6 +33,9 @@ bin-dst := base-dir / 'bin' / name
 desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps' / icon-svg
+# Notification sounds. `resolve_sound_path` derives this from the binary's own
+# location, so it follows whatever prefix is installed to.
+audio-dst := base-dir / 'share' / name / 'audio'
 
 # Local user data directory for development installs
 local-data-dir := env('XDG_DATA_HOME', env('HOME') + '/.local/share')
@@ -85,10 +89,12 @@ install:
     install -Dm0644 {{desktop-src}} {{desktop-dst}}
     install -Dm0644 {{appdata-src}} {{appdata-dst}}
     install -Dm0644 {{icon-svg-src}} {{icon-svg-dst}}
+    install -Dm0644 -t {{audio-dst}} {{audio-src}}/*.wav
 
 # Uninstalls installed files
 uninstall:
-    rm {{bin-dst}} {{desktop-dst}} {{icon-svg-dst}}
+    rm {{bin-dst}} {{desktop-dst}} {{appdata-dst}} {{icon-svg-dst}}
+    rm -rf {{audio-dst}}
 
 # Vendor dependencies locally
 vendor:

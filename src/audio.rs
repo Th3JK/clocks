@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use crate::components::SOUND_OPTIONS;
+use crate::sounds::SOUND_OPTIONS;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,9 +24,18 @@ pub fn resolve_sound_path(sound: &str) -> Option<String> {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
     let candidates = [
+        // Alongside the binary, for a portable/extracted layout.
         exe_dir
             .as_ref()
             .map(|d| d.join(format!("resources/audio/{}.wav", filename))),
+        // `<prefix>/share/clocks/audio`, derived from the binary rather than
+        // baked in, so it resolves for any prefix -- /usr, /usr/local, and
+        // /app inside a Flatpak all work without being special-cased.
+        exe_dir
+            .as_ref()
+            .and_then(|d| d.parent())
+            .map(|p| p.join(format!("share/clocks/audio/{}.wav", filename))),
+        // The build tree, for `cargo run`.
         Some(std::path::PathBuf::from(format!(
             concat!(env!("CARGO_MANIFEST_DIR"), "/resources/audio/{}.wav"),
             filename

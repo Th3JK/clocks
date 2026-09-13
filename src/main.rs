@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-mod app;
-mod audio;
-mod components;
-mod config;
-mod i18n;
-mod pages;
-mod quick_action;
-mod time_format;
+//! The GUI binary. Everything of substance lives in the `clocks` library, so
+//! the daemon can share it.
 
 fn main() -> cosmic::iced::Result {
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
-    i18n::init(&requested_languages);
+    clocks::i18n::init(&requested_languages);
 
     let settings = cosmic::app::Settings::default().size_limits(
         cosmic::iced::Limits::NONE
@@ -19,5 +13,5 @@ fn main() -> cosmic::iced::Result {
             .min_height(180.0),
     );
 
-    cosmic::app::run::<app::AppModel>(settings, ())
+    cosmic::app::run::<clocks::app::AppModel>(settings, ())
 }
