@@ -1,0 +1,49 @@
+name: Flatpak build
+
+# Builds the app as a Flatpak so a pull request can be installed and tested
+# before it lands. The manifest in .flatpak/ builds the checked-out source,
+# unlike the Flathub one which pins a released commit -- so this exercises the
+# branch, not the last release.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Lets you build a branch on demand without opening a PR.
+  workflow_dispatch:
+
+# A new push supersedes an in-flight build of the same ref.
+concurrency:
+  group: flatpak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build bundle
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak-cargo-generator deps
+        run: pip3 install aiohttp toml tomlkit
+
+      # Flatpak builds offline, so every crate has to be declared as a source
+      # up front. This is generated rather than committed because it is derived
+      # entirely from Cargo.lock and would go stale silently.
+      - name: Generate cargo-sources.json
+        run: |
+          curl -Lo flatpak-cargo-generator.py \
+            https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+          python3 flatpak-cargo-generator.py Cargo.lock -o .flatpak/cargo-sources.json
+
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: clocks.flatpak
+          manifest-path: .flatpak/dev.th3jk.clocks.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          # Keeps the build going when the runtime is already cached.
+          restore-cache: true
