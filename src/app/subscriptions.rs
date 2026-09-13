@@ -5,19 +5,19 @@
 
 use super::{CustomSoundTarget, Message};
 use cosmic::iced::keyboard::{self, key::Named, Key};
-use cosmic::iced::stream as iced_stream;
 use cosmic::prelude::*;
 use std::time::Duration;
 
-pub(super) fn tick_subscription() -> impl futures_util::Stream<Item = Message> {
-    use futures_util::SinkExt;
-    iced_stream::channel(1, async |mut emitter| {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
-        loop {
-            interval.tick().await;
-            _ = emitter.send(Message::Tick).await;
-        }
-    })
+/// The display tick, at a caller-chosen rate.
+///
+/// Only redraws: since scheduling moved into the daemon, nothing fires from
+/// here. The interval is therefore a pure display concern -- fast enough that
+/// whatever is on screen looks smooth, and no faster.
+///
+/// Changing `interval` changes the subscription's identity, so iced tears the
+/// old one down and starts a new one. That is how the rate adapts.
+pub(super) fn tick_subscription(interval: Duration) -> cosmic::iced::Subscription<Message> {
+    cosmic::iced::time::every(interval).map(|_| Message::Tick)
 }
 
 pub(super) fn input_subscription(

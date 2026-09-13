@@ -52,6 +52,8 @@ impl AsMimeTypes for DndIndex {
     }
 }
 
+type DragIconBuilder<'a> = Box<dyn Fn(usize, Vector) -> (Element<'static, ()>, tree::State, Vector) + 'a>;
+
 /// A drag-to-reorder list widget.
 ///
 /// Wraps a pre-built inner element (column of cards) and handles drag events
@@ -68,7 +70,7 @@ pub struct ReorderList<'a, Message> {
     on_reorder: Option<Box<dyn Fn(usize, usize) -> Message + 'a>>,
     on_finish: Option<Message>,
     on_cancel: Option<Message>,
-    drag_icon_builder: Option<Box<dyn Fn(usize, Vector) -> (Element<'static, ()>, tree::State, Vector) + 'a>>,
+    drag_icon_builder: Option<DragIconBuilder<'a>>,
 }
 
 impl<'a, Message: Clone + 'static> ReorderList<'a, Message> {

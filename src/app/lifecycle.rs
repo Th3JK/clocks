@@ -2,6 +2,8 @@
 //
 // Implements the `cosmic::Application` trait for `AppModel`.
 
+use std::time::Duration;
+
 use super::persistence::{
     restore_alarms, restore_chess, restore_countdowns, restore_nav, restore_pomodoros, restore_stopwatch_history, restore_timers,
     restore_workouts, restore_world_clocks,
@@ -388,7 +390,22 @@ impl cosmic::Application for AppModel {
                 .watch_state::<crate::runtime::RuntimeState>(Self::APP_ID)
                 .map(|update| Message::UpdateRuntime(update.config)),
         );
-        subscriptions.push(Subscription::run(tick_subscription));
+        // Adaptive, because an idle window has nothing to redraw. The stopwatch
+        // shows hundredths and so genuinely needs the rate; everything else
+        // displays to the second.
+        let tick_rate = if self.stopwatch.is_running {
+            Duration::from_millis(16)
+        } else if !self.runtime.timers.is_empty()
+            || !self.runtime.pomodoro.is_empty()
+            || self.chess.is_running()
+            || self.workout.has_running()
+            || self.countdown.has_pending()
+        {
+            Duration::from_millis(500)
+        } else {
+            Duration::from_millis(1000)
+        };
+        subscriptions.push(tick_subscription(tick_rate));
         subscriptions.push(listen_raw(input_subscription));
 
         Subscription::batch(subscriptions)

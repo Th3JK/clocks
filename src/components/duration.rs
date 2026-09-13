@@ -8,8 +8,8 @@ pub fn format_duration(duration: Duration) -> String {
     let hours = total_secs / 3600;
     let minutes = (total_secs % 3600) / 60;
     let secs = total_secs % 60;
-    let tenths = duration.subsec_millis() / 100;
-    format!("{:02}:{:02}:{:02}.{}", hours, minutes, secs, tenths)
+    let hundredths = duration.subsec_millis() / 10;
+    format!("{:02}:{:02}:{:02}.{:02}", hours, minutes, secs, hundredths)
 }
 
 /// Split a duration into (prefix, seconds, suffix) parts for styled display.
@@ -19,11 +19,10 @@ pub fn format_duration_parts(duration: Duration) -> (String, String, String) {
     let hours = total_secs / 3600;
     let minutes = (total_secs % 3600) / 60;
     let secs = total_secs % 60;
-    let tenths = duration.subsec_millis() / 100;
-
+    let hundredths = duration.subsec_millis() / 10;
     let prefix = format!("{:02}:{:02}:", hours, minutes);
     let seconds = format!("{:02}", secs);
-    let suffix = format!(".{}", tenths);
+    let suffix = format!(".{:02}", hundredths);
 
     (prefix, seconds, suffix)
 }

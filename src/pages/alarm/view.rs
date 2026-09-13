@@ -232,7 +232,7 @@ impl AlarmState {
 
                 let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
                     .on_start_drag(Message::StartDrag)
-                    .on_reorder(|from, to| Message::Reorder(from, to))
+                    .on_reorder(Message::Reorder)
                     .on_finish(Message::FinishDrag)
                     .on_cancel(Message::CancelDrag)
                     .drag_icon(move |index, offset| {

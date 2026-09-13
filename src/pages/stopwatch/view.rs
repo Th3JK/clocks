@@ -6,16 +6,26 @@ use super::model::*;
 use super::Message;
 use crate::components::{format_duration, format_duration_parts};
 use crate::fl;
-use cosmic::iced::font::Weight;
+use cosmic::iced::font::{Family, Weight};
 use cosmic::iced::{Alignment, Color, Length};
 use cosmic::prelude::*;
 use cosmic::widget;
 use std::time::Duration;
 
-/// Font weight 300 (Light) for the hero time display.
-fn light_font() -> cosmic::iced::Font {
+/// Font weight 300 (Light) and Monospace for the hero time display.
+fn light_mono_font() -> cosmic::iced::Font {
     cosmic::iced::Font {
+        family: Family::Monospace,
         weight: Weight::Light,
+        ..cosmic::font::default()
+    }
+}
+
+/// Font weight Bold and Monospace for the seconds display.
+fn bold_mono_font() -> cosmic::iced::Font {
+    cosmic::iced::Font {
+        family: Family::Monospace,
+        weight: Weight::Bold,
         ..cosmic::font::default()
     }
 }
@@ -40,9 +50,9 @@ impl StopwatchState {
         let (prefix, seconds, suffix) = format_duration_parts(self.elapsed);
         let time_row = widget::row::with_capacity(3)
             .align_y(Alignment::Center)
-            .push(widget::text(prefix).size(72.0).font(light_font()))
-            .push(widget::text(seconds).size(72.0).font(cosmic::font::bold()))
-            .push(widget::text(suffix).size(72.0).font(light_font()));
+            .push(widget::text(prefix).size(72.0).font(light_mono_font()))
+            .push(widget::text(seconds).size(72.0).font(bold_mono_font()))
+            .push(widget::text(suffix).size(72.0).font(light_mono_font()));
         let time_display = widget::container(time_row)
             .align_x(Alignment::Center)
             .width(Length::Fill)
