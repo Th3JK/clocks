@@ -15,6 +15,9 @@ pub enum Message {
     Reset(u32),
     Delete(u32),
     Tick,
+    // Focus mode (single workout, full page)
+    Focus(u32),
+    Unfocus,
     // Settings sidebar
     OpenSettings,
     StartEditWorkout(u32),
@@ -31,6 +34,22 @@ pub enum Message {
     ApplyPreset(Preset),
     EditSound(String),
     BrowseCustomSound,
+    // Block editor (full page). Indices address `edit_blocks`; `isize` deltas
+    // are -1/+1 for move up/down.
+    OpenBlockEditor(u32),
+    CloseBlockEditor,
+    SaveBlocks,
+    AddBlock,
+    RemoveBlock(usize),
+    MoveBlock(usize, isize),
+    SetBlockRepeat(usize, u32),
+    ToggleSkipLastRecovery(usize),
+    AddStep(usize),
+    RemoveStep(usize, usize),
+    MoveStep(usize, usize, isize),
+    SetStepLabel(usize, usize, String),
+    SetStepSecs(usize, usize, u32),
+    SetStepKind(usize, usize, StepKind),
     // Edit mode (reorder/delete)
     ToggleEditMode,
     StartDrag(usize),

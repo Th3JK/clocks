@@ -137,13 +137,31 @@ pub(super) fn build_config_from_state(
         .iter()
         .map(|w| SavedWorkout {
             label: w.label.clone(),
-            prep_secs: w.prep_secs,
-            work_secs: w.work_secs,
-            rest_secs: w.rest_secs,
-            rounds: w.rounds,
-            sets: w.sets,
-            set_rest_secs: w.set_rest_secs,
+            // The legacy scalars are no longer the source of truth; they are
+            // written as a benign fallback so an older build can still open the
+            // config without seeing a zero-length workout.
+            prep_secs: 0,
+            work_secs: 30,
+            rest_secs: 10,
+            rounds: 8,
+            sets: 1,
+            set_rest_secs: 60,
             sound: w.sound.clone(),
+            blocks: Some(w.blocks.iter().map(save_block).collect()),
+        })
+        .collect();
+
+    let countdown_events = co
+        .events
+        .iter()
+        .map(|e| SavedCountdownEvent {
+            label: e.label.clone(),
+            target: e.target,
+            yearly: e.yearly,
+            sound: e.sound.clone(),
+            reminders: e.reminders.iter().map(|r| r.key().to_string()).collect(),
+            fired: e.fired.iter().map(|r| r.key().to_string()).collect(),
+            arrived: e.arrived,
         })
         .collect();
 
@@ -183,19 +201,30 @@ pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
         ..Default::default()
     };
     for (i, w) in config.workouts.iter().enumerate() {
+        // Workouts saved before blocks existed carry `None` here; lower their
+        // six scalars into the equivalent block layout so they behave exactly
+        // as they did before.
+        let blocks = match &w.blocks {
+            Some(blocks) => blocks.iter().map(load_block).collect(),
+            None => workout::simple_blocks(
+                w.prep_secs,
+                w.work_secs,
+                w.rest_secs,
+                w.rounds,
+                w.sets,
+                w.set_rest_secs,
+            ),
+        };
         state.workouts.push(workout::WorkoutEntry::new(
             (i + 1) as u32,
             w.label.clone(),
-            w.prep_secs,
-            w.work_secs,
-            w.rest_secs,
-            w.rounds,
-            w.sets,
-            w.set_rest_secs,
+            blocks,
             w.sound.clone(),
         ));
     }
-    state.next_id = config.workouts.len() as u32 + 1;
+    // Derive from the highest id in use rather than the count: positional ids
+    // collide with a live id after deletions.
+    state.next_id = state.workouts.iter().map(|w| w.id).max().unwrap_or(0) + 1;
     state
 }
 

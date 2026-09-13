@@ -92,6 +92,32 @@ pub struct SavedWorkout {
     pub sets: u32,
     pub set_rest_secs: u32,
     pub sound: String,
+    /// Block structure. `None` marks a workout saved before blocks existed —
+    /// those are lowered from the six scalars above on restore. The scalars are
+    /// kept so a config written by this version still loads in an older build.
+    #[serde(default)]
+    pub blocks: Option<Vec<SavedBlock>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedBlock {
+    pub repeat: u32,
+    pub steps: Vec<SavedStep>,
+    pub skip_last_recovery: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedStep {
+    pub label: String,
+    pub secs: u32,
+    pub kind: SavedStepKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum SavedStepKind {
+    Prep,
+    Effort,
+    Recovery,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

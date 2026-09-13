@@ -644,6 +644,13 @@ impl cosmic::Application for AppModel {
                     self.workout.update(msg.clone());
                     self.core.window.show_context = false;
                 }
+                workout::Message::OpenBlockEditor(_) => {
+                    // The block editor owns the whole page, so close the drawer
+                    // behind it rather than leaving both open.
+                    self.workout.update(msg.clone());
+                    self.core.window.show_context = false;
+                    self.save_state();
+                }
                 workout::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Workout);
                 }
