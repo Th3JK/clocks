@@ -3,7 +3,7 @@
 // Implements the `cosmic::Application` trait for `AppModel`.
 
 use super::persistence::{
-    restore_alarms, restore_chess, restore_countdowns, restore_pomodoros, restore_stopwatch_history, restore_timers,
+    restore_alarms, restore_chess, restore_countdowns, restore_nav, restore_pomodoros, restore_stopwatch_history, restore_timers,
     restore_workouts, restore_world_clocks,
 };
 use super::subscriptions::{
@@ -49,48 +49,8 @@ impl cosmic::Application for AppModel {
         core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        let mut nav = nav_bar::Model::default();
-
-        nav.insert()
-            .text(fl!("nav-world-clocks"))
-            .data::<Page>(Page::WorldClocks)
-            .icon(icon::from_name("preferences-system-time-symbolic"))
-            .activate();
-
-        nav.insert()
-            .text(fl!("nav-stopwatch"))
-            .data::<Page>(Page::Stopwatch)
-            .icon(icon::from_name("media-playback-start-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-alarm"))
-            .data::<Page>(Page::Alarm)
-            .icon(icon::from_name("alarm-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-timer"))
-            .data::<Page>(Page::Timer)
-            .icon(icon::icon(super::bundled_icon(super::TIMER_ICON)));
-
-        nav.insert()
-            .text(fl!("nav-pomodoro"))
-            .data::<Page>(Page::Pomodoro)
-            .icon(icon::icon(super::bundled_icon(super::POMODORO_ICON)));
-
-        nav.insert()
-            .text(fl!("nav-chess"))
-            .data::<Page>(Page::Chess)
-            .icon(icon::from_name("view-grid-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-workout"))
-            .data::<Page>(Page::Workout)
-            .icon(icon::from_name("emblem-favorite-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-countdown"))
-            .data::<Page>(Page::Countdown)
-            .icon(icon::icon(super::bundled_icon(super::COUNTDOWN_ICON)));
+        // Populated by `rebuild_nav` once the stored order is known.
+        let nav = nav_bar::Model::default();
 
         let about = About::default()
             .name(fl!("app-title"))
@@ -127,6 +87,7 @@ impl cosmic::Application for AppModel {
         let chess = restore_chess(&config);
         let workout = restore_workouts(&config);
         let countdown = restore_countdowns(&config);
+        let (nav_order, nav_hidden) = restore_nav(&config);
 
         // A config written before `time_format` existed carries `None`; fall back
         // to the legacy flag so an existing user keeps the display they had.
@@ -156,6 +117,8 @@ impl cosmic::Application for AppModel {
             time_format,
             use_12h,
             show_shortcuts_dialog: false,
+            nav_order,
+            nav_hidden,
             show_palette: false,
             palette_input: String::new(),
             pending_destructive_action: None,
@@ -181,6 +144,8 @@ impl cosmic::Application for AppModel {
             alarm_audio_stops: HashMap::new(),
             toasts: toaster::Toasts::new(Message::CloseToast),
         };
+
+        app.rebuild_nav();
 
         if app.auto_sort_alarms {
             app.sort_alarms();
@@ -844,6 +809,34 @@ impl cosmic::Application for AppModel {
             Message::ShowShortcutsDialog => {
                 self.show_shortcuts_dialog = true;
                 self.core.window.show_context = false;
+            }
+
+            Message::ToggleNavPage(page, visible) => {
+                if visible {
+                    self.nav_hidden.retain(|p| *p != page);
+                } else if !self.nav_hidden.contains(&page) {
+                    // Refuse to hide the last page: an empty sidebar leaves the
+                    // app on "select a view" with no way back.
+                    let visible_count = self
+                        .nav_order
+                        .iter()
+                        .filter(|p| !self.nav_hidden.contains(p))
+                        .count();
+                    if visible_count > 1 {
+                        self.nav_hidden.push(page);
+                    }
+                }
+                self.rebuild_nav();
+                return self.update_title();
+            }
+            Message::MoveNavPage(from, to) => {
+                // Both indices are produced by the settings rows and so are
+                // always in range; bounds-check anyway rather than risk a panic
+                // on a view built from stale state.
+                if from != to && from < self.nav_order.len() && to < self.nav_order.len() {
+                    self.nav_order.swap(from, to);
+                    self.rebuild_nav();
+                }
             }
 
             Message::OpenPalette => {

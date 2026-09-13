@@ -213,6 +213,8 @@ shortcuts-skip-break = Пропустить перерыв (Помодоро)
 shortcuts-chess-switch = Переключить часы (Шахматы)
 
 # Settings — world clocks section
+settings-section-sidebar = Боковая панель
+settings-sidebar-description = Стрелками меняйте порядок, выключите чтобы скрыть
 settings-section-world-clocks = Мировые часы
 settings-auto-sort-world-clocks = Автоматически сортировать по смещению часового пояса
 

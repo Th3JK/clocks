@@ -24,7 +24,7 @@ pub struct Config {
     /// existing display rather than silently switching them to System.
     pub use_12h: bool,
     /// 24-hour, 12-hour, or follow the desktop. `None` means a config written
-    /// before this field existed — migrate from `use_12h`.
+    /// before this field existed â migrate from `use_12h`.
     #[serde(default)]
     pub time_format: Option<crate::time_format::TimeFormat>,
     /// Confirmation dialog settings (default: true = show confirmation)
@@ -62,6 +62,14 @@ pub struct Config {
     /// Saved countdown events
     #[serde(default)]
     pub countdown_events: Vec<SavedCountdownEvent>,
+    /// Sidebar page order, by stable page key. Empty means "never customised",
+    /// which restores the built-in order — and lets a page added in a later
+    /// release appear rather than being treated as hidden.
+    #[serde(default)]
+    pub nav_order: Vec<String>,
+    /// Page keys hidden from the sidebar.
+    #[serde(default)]
+    pub nav_hidden: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -91,6 +99,8 @@ impl Default for Config {
             chess: SavedChessConfig::default(),
             workouts: Vec::new(),
             countdown_events: Vec::new(),
+            nav_order: Vec::new(),
+            nav_hidden: Vec::new(),
         }
     }
 }
@@ -102,7 +112,7 @@ pub struct SavedCountdownEvent {
     pub yearly: bool,
     pub sound: String,
     /// Reminder offsets, stored by name so the set can grow without breaking
-    /// existing configs — unknown names are dropped on load.
+    /// existing configs â unknown names are dropped on load.
     pub reminders: Vec<String>,
     #[serde(default)]
     pub fired: Vec<String>,
@@ -120,7 +130,7 @@ pub struct SavedWorkout {
     pub sets: u32,
     pub set_rest_secs: u32,
     pub sound: String,
-    /// Block structure. `None` marks a workout saved before blocks existed —
+    /// Block structure. `None` marks a workout saved before blocks existed â
     /// those are lowered from the six scalars above on restore. The scalars are
     /// kept so a config written by this version still loads in an older build.
     #[serde(default)]

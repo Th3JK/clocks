@@ -213,6 +213,8 @@ shortcuts-skip-break = Přeskočit pauzu (Pomodoro)
 shortcuts-chess-switch = Přepnout hodiny (Šachy)
 
 # Settings — world clocks section
+settings-section-sidebar = Postranní panel
+settings-sidebar-description = Šipkami změníte pořadí, přepínačem stránku skryjete
 settings-section-world-clocks = Světové hodiny
 settings-auto-sort-world-clocks = Automaticky řadit podle časového posunu
 

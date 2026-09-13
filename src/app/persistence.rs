@@ -23,6 +23,8 @@ pub(super) fn build_config_from_state(
     ch: &chess::ChessState,
     wo: &workout::WorkoutState,
     co: &countdown::CountdownState,
+    nav_order: &[crate::pages::Page],
+    nav_hidden: &[crate::pages::Page],
     time_format: crate::time_format::TimeFormat,
     confirm_delete_alarm: bool,
     confirm_delete_timer: bool,
@@ -191,7 +193,35 @@ pub(super) fn build_config_from_state(
         chess,
         workouts,
         countdown_events,
+        nav_order: nav_order.iter().map(|p| p.key().to_string()).collect(),
+        nav_hidden: nav_hidden.iter().map(|p| p.key().to_string()).collect(),
     }
+}
+
+/// Sidebar order and hidden set from the config.
+///
+/// An empty stored order means the sidebar was never customised, so fall back
+/// to the built-in order. Any page missing from a stored order is appended:
+/// that is how a page added in a later release shows up instead of silently
+/// vanishing for anyone with a saved layout.
+pub(super) fn restore_nav(config: &Config) -> (Vec<crate::pages::Page>, Vec<crate::pages::Page>) {
+    use crate::pages::Page;
+    let mut order: Vec<Page> = config
+        .nav_order
+        .iter()
+        .filter_map(|k| Page::from_key(k))
+        .collect();
+    for page in Page::ALL {
+        if !order.contains(&page) {
+            order.push(page);
+        }
+    }
+    let hidden = config
+        .nav_hidden
+        .iter()
+        .filter_map(|k| Page::from_key(k))
+        .collect();
+    (order, hidden)
 }
 
 pub(super) fn restore_chess(config: &Config) -> chess::ChessState {

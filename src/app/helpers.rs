@@ -161,6 +161,8 @@ impl AppModel {
             &self.chess,
             &self.workout,
             &self.countdown,
+            &self.nav_order,
+            &self.nav_hidden,
             self.time_format,
             self.confirm_delete_alarm,
             self.confirm_delete_timer,
@@ -191,6 +193,44 @@ impl AppModel {
     pub(super) fn stop_alarm_audio(&mut self, alarm_id: u32) {
         if let Some(stop) = self.alarm_audio_stops.remove(&alarm_id) {
             stop.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Rebuild the sidebar from the stored order and visibility.
+    ///
+    /// The nav is cleared and repopulated rather than mutated in place, because
+    /// `Model::remove` bumps the slotmap generation — any `Entity` held across
+    /// the call is silently stale, so entities must never be persisted or
+    /// cached. Pages are looked up by `Page`, which is stable.
+    pub(super) fn rebuild_nav(&mut self) {
+        // Remember the active page, not its entity: the entity will not survive.
+        let previously_active = self.nav.active_data::<Page>().copied();
+
+        self.nav.clear();
+        for page in &self.nav_order {
+            if self.nav_hidden.contains(page) {
+                continue;
+            }
+            self.nav
+                .insert()
+                .text(page_title(*page))
+                .data::<Page>(*page)
+                .icon(page_icon(*page));
+        }
+
+        // `clear` deactivates everything. Leaving it that way makes `view()`
+        // fall through to "select a view", so always land somewhere: the page
+        // that was active if it is still visible, otherwise the first one.
+        let target = previously_active
+            .filter(|p| !self.nav_hidden.contains(p))
+            .and_then(|p| {
+                self.nav
+                    .iter()
+                    .find(|e| self.nav.data::<Page>(*e) == Some(&p))
+            })
+            .or_else(|| self.nav.iter().next());
+        if let Some(entity) = target {
+            self.nav.activate(entity);
         }
     }
 
@@ -631,5 +671,34 @@ impl AppModel {
         } else {
             Task::none()
         }
+    }
+}
+
+/// Nav label for a page.
+pub(super) fn page_title(page: Page) -> String {
+    match page {
+        Page::WorldClocks => fl!("nav-world-clocks"),
+        Page::Stopwatch => fl!("nav-stopwatch"),
+        Page::Alarm => fl!("nav-alarm"),
+        Page::Timer => fl!("nav-timer"),
+        Page::Pomodoro => fl!("nav-pomodoro"),
+        Page::Chess => fl!("nav-chess"),
+        Page::Workout => fl!("nav-workout"),
+        Page::Countdown => fl!("nav-countdown"),
+    }
+}
+
+/// Nav icon for a page. Timer, Pomodoro and Countdown are bundled because no
+/// system glyph distinguishes them.
+pub(super) fn page_icon(page: Page) -> widget::icon::Icon {
+    match page {
+        Page::WorldClocks => widget::icon::from_name("preferences-system-time-symbolic").icon(),
+        Page::Stopwatch => widget::icon::from_name("media-playback-start-symbolic").icon(),
+        Page::Alarm => widget::icon::from_name("alarm-symbolic").icon(),
+        Page::Timer => widget::icon::icon(super::bundled_icon(super::TIMER_ICON)),
+        Page::Pomodoro => widget::icon::icon(super::bundled_icon(super::POMODORO_ICON)),
+        Page::Chess => widget::icon::from_name("view-grid-symbolic").icon(),
+        Page::Workout => widget::icon::from_name("emblem-favorite-symbolic").icon(),
+        Page::Countdown => widget::icon::icon(super::bundled_icon(super::COUNTDOWN_ICON)),
     }
 }

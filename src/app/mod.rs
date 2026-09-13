@@ -74,6 +74,10 @@ pub struct AppModel {
     /// back over the stored preference.
     use_12h: bool,
     show_shortcuts_dialog: bool,
+    /// Sidebar order and hidden set. Persisted by page key, never by
+    /// `nav_bar::Entity` - those go stale the moment the model is rebuilt.
+    nav_order: Vec<crate::pages::Page>,
+    nav_hidden: Vec<crate::pages::Page>,
     /// Quick-action palette state (session-only).
     show_palette: bool,
     palette_input: String,
@@ -149,6 +153,10 @@ pub enum Message {
     PaletteInput(String),
     PaletteSubmit,
     PaletteRun(crate::quick_action::QuickAction),
+    // Sidebar customisation
+    ToggleNavPage(crate::pages::Page, bool),
+    /// Move the sidebar page at the first index to the second.
+    MoveNavPage(usize, usize),
     // Confirmation dialogs
     ConfirmDestructiveAction,
     CancelDestructiveAction,

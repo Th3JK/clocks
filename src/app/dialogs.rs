@@ -4,7 +4,7 @@
 
 use super::{AppModel, ConfirmationCategory, DestructiveAction, Message};
 use crate::fl;
-use cosmic::iced::Length;
+use cosmic::iced::{Alignment, Color, Length};
 use cosmic::prelude::*;
 use cosmic::widget;
 
@@ -41,6 +41,11 @@ impl AppModel {
                 crate::time_format::TimeFormat::Twelve,
             ));
         col = col.push(row);
+
+        col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-sidebar")));
+        col = col.push(widget::text::caption(fl!("settings-sidebar-description")));
+        col = col.push(self.nav_settings_view());
 
         col = col.push(widget::divider::horizontal::default());
         col = col.push(widget::text::title4(fl!("settings-section-world-clocks")));
@@ -106,6 +111,87 @@ impl AppModel {
         );
 
         col.into()
+    }
+
+    /// Sidebar customisation: arrows to reorder, toggle to show or hide.
+    ///
+    /// Deliberately buttons rather than drag-and-drop. The settings drawer is an
+    /// iced overlay, and `dnd_rectangles` walks only the base layout, so a drop
+    /// target inside a context drawer is never registered with the compositor:
+    /// the drag starts, the icon appears, and nothing else ever happens. The
+    /// `ReorderList` used on the alarm/timer/pomodoro/workout/world-clock pages
+    /// works because those live in `view()`.
+    fn nav_settings_view(&self) -> Element<'_, Message> {
+        let cosmic::cosmic_theme::Spacing {
+            space_xxs, space_xs, ..
+        } = cosmic::theme::spacing();
+
+        let visible_count = self
+            .nav_order
+            .iter()
+            .filter(|p| !self.nav_hidden.contains(p))
+            .count();
+        let last = self.nav_order.len().saturating_sub(1);
+
+        let rows: Vec<Element<'_, Message>> = self
+            .nav_order
+            .iter()
+            .enumerate()
+            .map(|(index, page)| {
+                let page = *page;
+                let shown = !self.nav_hidden.contains(&page);
+                // The last visible page cannot be hidden, or the app is left on
+                // "select a view" with nothing to click.
+                let can_hide = !shown || visible_count > 1;
+
+                // Disabled rather than hidden at the ends, so every row keeps
+                // the same width and the toggles stay in one column.
+                let move_button = |name, target: Option<usize>| {
+                    widget::button::icon(widget::icon::from_name(name))
+                        .on_press_maybe(target.map(|to| Message::MoveNavPage(index, to)))
+                };
+
+                let row = widget::row::with_capacity(5)
+                    .align_y(Alignment::Center)
+                    .spacing(space_xs)
+                    .push(super::helpers::page_icon(page).size(16))
+                    .push(widget::text::body(super::helpers::page_title(page)).width(Length::Fill))
+                    .push(move_button(
+                        "go-up-symbolic",
+                        (index > 0).then(|| index - 1),
+                    ))
+                    .push(move_button(
+                        "go-down-symbolic",
+                        (index < last).then(|| index + 1),
+                    ))
+                    .push(
+                        widget::toggler(shown)
+                            .on_toggle_maybe(can_hide.then_some(move |v| {
+                                Message::ToggleNavPage(page, v)
+                            })),
+                    );
+
+                widget::container(row)
+                    .padding(8)
+                    .width(Length::Fill)
+                    .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                        let cosmic = theme.cosmic();
+                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                            theme,
+                            &cosmic::theme::Container::Primary,
+                        );
+                        style.border.radius = cosmic.radius_s().into();
+                        style.background =
+                            Some(Color::from(cosmic.bg_component_color()).into());
+                        style
+                    })))
+                    .into()
+            })
+            .collect();
+
+        widget::column::with_children(rows)
+            .spacing(space_xxs)
+            .into()
     }
 
     /// Quick-action palette. Shows a live reading of what the current text
