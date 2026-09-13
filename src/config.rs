@@ -98,6 +98,9 @@ impl Default for Config {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedCountdownEvent {
+    /// Stable identity. The daemon records delivered reminders against it, so
+    /// positional ids would re-point them on reorder.
+    pub id: u32,
     pub label: String,
     pub target: chrono::DateTime<chrono::Local>,
     pub yearly: bool,
@@ -105,10 +108,6 @@ pub struct SavedCountdownEvent {
     /// Reminder offsets, stored by name so the set can grow without breaking
     /// existing configs — unknown names are dropped on load.
     pub reminders: Vec<String>,
-    #[serde(default)]
-    pub fired: Vec<String>,
-    #[serde(default)]
-    pub arrived: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

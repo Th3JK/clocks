@@ -13,7 +13,9 @@
 //! - An autostart entry, so it is running before the GUI ever opens.
 
 use clocks::config::Config;
-use clocks::runtime::{PomodoroRun, RingingRecord, RuntimeState, SessionKind, TimerRun};
+use clocks::runtime::{
+    CountdownDelivery, PomodoroRun, RingingRecord, RuntimeState, SessionKind, TimerRun,
+};
 use clocks::{audio, ipc, scheduler};
 use cosmic_config::CosmicConfigEntry;
 use std::collections::HashMap;
@@ -567,6 +569,80 @@ fn tick(daemon: &Arc<Daemon>) {
         audio::play_sound(&sound);
     }
 
+    // Countdown: delivery only -- nothing to start or pause. Reminders fire in
+    // threshold order, furthest-out first, so an event whose thresholds were all
+    // crossed while nothing was running does not arrive as a jumbled burst.
+    let mut deliveries: Vec<(String, String, clocks::pages::countdown::Reminder, u32)> =
+        Vec::new();
+    let mut arrivals: Vec<(String, String, u32)> = Vec::new();
+    for event in &config.countdown_events {
+        let target = event.target;
+        let secs_until = target.signed_duration_since(now).num_seconds();
+        let passed = secs_until <= 0;
+
+        // Target back in the future while we still hold an arrival record means
+        // the event was re-armed -- a yearly one rolled forward by the GUI, or
+        // the date was edited. Forget its deliveries so next year fires. Without
+        // this a yearly event would notify exactly once, ever.
+        if !passed && state.was_delivered(event.id, CountdownDelivery::ARRIVED) {
+            state
+                .countdown_delivered
+                .retain(|d| d.event_id != event.id);
+        }
+
+        if !passed {
+            let mut due: Vec<clocks::pages::countdown::Reminder> = event
+                .reminders
+                .iter()
+                .filter_map(|k| clocks::pages::countdown::Reminder::from_key(k))
+                .filter(|r| {
+                    secs_until <= r.secs_before() && !state.was_delivered(event.id, r.key())
+                })
+                .collect();
+            due.sort_by_key(|r| std::cmp::Reverse(r.secs_before()));
+            for reminder in due {
+                state.countdown_delivered.push(CountdownDelivery {
+                    event_id: event.id,
+                    key: reminder.key().to_string(),
+                });
+                deliveries.push((event.label.clone(), event.sound.clone(), reminder, event.id));
+            }
+        } else if !state.was_delivered(event.id, CountdownDelivery::ARRIVED) {
+            state.countdown_delivered.push(CountdownDelivery {
+                event_id: event.id,
+                key: CountdownDelivery::ARRIVED.to_string(),
+            });
+            arrivals.push((event.label.clone(), event.sound.clone(), event.id));
+        }
+    }
+
+    // Delivery records for events that no longer exist are dead weight.
+    let live: Vec<u32> = config.countdown_events.iter().map(|e| e.id).collect();
+    state
+        .countdown_delivered
+        .retain(|d| live.contains(&d.event_id));
+
+    for (label, sound, reminder, _id) in deliveries {
+        notify_opening(
+            clocks::pages::Page::Countdown,
+            clocks::fl!("notification-countdown"),
+            clocks::fl!(
+                "countdown-reminder-body",
+                label = label,
+                when = reminder.display_name()
+            ),
+        );
+        audio::play_sound(&sound);
+    }
+    for (label, sound, _id) in arrivals {
+        notify_opening(
+            clocks::pages::Page::Countdown,
+            clocks::fl!("notification-countdown"),
+            clocks::fl!("countdown-arrived", label = label),
+        );
+        audio::play_sound(&sound);
+    }
+
     // Switching a spent one-shot back on in the GUI re-arms it. The GUI cannot
     // write here, so the daemon infers it from the definition being enabled.
     state
@@ -594,7 +670,8 @@ fn tick(daemon: &Arc<Daemon>) {
         || state.snoozed != before.snoozed
         || state.consumed_once != before.consumed_once
         || state.timers != before.timers
-        || state.pomodoro != before.pomodoro;
+        || state.pomodoro != before.pomodoro
+        || state.countdown_delivered != before.countdown_delivered;
 
     // Or the checkpoint has drifted. This has to reach disk or the catch-up
     // window is wrong after a restart: `since` would fall back to `now` and

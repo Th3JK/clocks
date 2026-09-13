@@ -998,6 +998,17 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
+                for event in &mut self.countdown.events {
+                    event.fired = event
+                        .reminders
+                        .iter()
+                        .copied()
+                        .filter(|r| runtime.was_delivered(event.id, r.key()))
+                        .collect();
+                    event.arrived = runtime
+                        .was_delivered(event.id, crate::runtime::CountdownDelivery::ARRIVED);
+                }
+
                 // Daily stats are ours to write, so fold in whatever the daemon
                 // banked while we were closed and tell it to clear the counter.
                 let banked: Vec<(u32, u64)> = runtime

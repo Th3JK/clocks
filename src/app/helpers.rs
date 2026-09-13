@@ -67,15 +67,11 @@ impl AppModel {
             }
         }
 
-        // Countdown reminders and arrivals. The page rate-limits itself to one
-        // check per wall-clock second; the guard just skips it entirely when
-        // nothing is outstanding.
+        // Countdown: the daemon delivers reminders and arrivals. This is only
+        // the yearly roll-forward, which rewrites a definition field and so has
+        // to stay on this side.
         if self.countdown.has_pending() {
-            let notifications = self.countdown.update(countdown::Message::Tick);
-            for (msg, sound) in notifications {
-                audio::send_notification(&fl!("notification-countdown"), &msg);
-                audio::play_sound(&sound);
-            }
+            self.countdown.update(countdown::Message::Tick);
         }
 
         // Alarms are deliberately absent: `clocks-daemon` owns them. It fires

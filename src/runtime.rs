@@ -95,6 +95,23 @@ pub struct PomodoroRun {
     pub unrecorded_focus_secs: u64,
 }
 
+/// A countdown notification already sent, so it is not sent twice.
+///
+/// `key` is a reminder's stable name, or [`CountdownDelivery::ARRIVED`] for the
+/// event itself. Keyed by id rather than position so reordering the list cannot
+/// re-point a delivery record at a different event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CountdownDelivery {
+    pub event_id: u32,
+    pub key: String,
+}
+
+impl CountdownDelivery {
+    /// Marks the event's own arrival, as opposed to a reminder before it. Not a
+    /// reminder key, so it cannot collide with one.
+    pub const ARRIVED: &'static str = "@arrived";
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, CosmicConfigEntry)]
 #[version = 1]
 pub struct RuntimeState {
@@ -132,6 +149,15 @@ pub struct RuntimeState {
     /// Pomodoros the daemon is running.
     #[serde(default)]
     pub pomodoro: Vec<PomodoroRun>,
+
+    /// Countdown notifications already sent.
+    ///
+    /// Previously `fired`/`arrived` on the event itself, which were mutated
+    /// during the GUI's tick -- a message in the `should_save` deny-list with no
+    /// compensating save, so they persisted only if an unrelated message
+    /// happened to follow. One writer here, always saved.
+    #[serde(default)]
+    pub countdown_delivered: Vec<CountdownDelivery>,
 }
 
 impl Default for RuntimeState {
@@ -143,6 +169,7 @@ impl Default for RuntimeState {
             checked_through: None,
             timers: Vec::new(),
             pomodoro: Vec::new(),
+            countdown_delivered: Vec::new(),
         }
     }
 }
@@ -175,6 +202,12 @@ impl RuntimeState {
 
     pub fn pomodoro(&self, timer_id: u32) -> Option<&PomodoroRun> {
         self.pomodoro.iter().find(|p| p.timer_id == timer_id)
+    }
+
+    pub fn was_delivered(&self, event_id: u32, key: &str) -> bool {
+        self.countdown_delivered
+            .iter()
+            .any(|d| d.event_id == event_id && d.key == key)
     }
 }
 

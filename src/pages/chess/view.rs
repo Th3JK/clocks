@@ -4,7 +4,7 @@
 
 use super::Message;
 use super::model::*;
-use crate::components::format_duration_hms;
+use crate::components::format_duration_clock;
 use crate::fl;
 use cosmic::iced::font::Weight;
 use cosmic::iced::{Alignment, Border, Color, Length};
@@ -256,9 +256,13 @@ impl ChessState {
             None
         };
 
-        let mut time_text = widget::text(format_duration_hms(remaining))
-            .size(48.0)
-            .font(light_font());
+        // Sized to fit the card at its narrowest: five characters at 44px of a
+        // monospace face, or seven once a game passes an hour.
+        let mut time_text = widget::text(format_duration_clock(remaining))
+            .size(44.0)
+            .font(light_font())
+            .width(Length::Fill)
+            .align_x(Alignment::Center);
         if let Some(c) = time_color {
             time_text = time_text.class(cosmic::theme::Text::Color(c));
         }

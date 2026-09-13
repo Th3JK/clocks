@@ -76,10 +76,15 @@ pub struct CountdownEvent {
     pub yearly: bool,
     pub sound: String,
     pub reminders: Vec<Reminder>,
-    /// Reminders already delivered for the current target, so each fires once.
-    /// Cleared when a yearly event rolls over.
+    /// Reminders already delivered, mirrored from the daemon.
+    ///
+    /// Not authoritative and not persisted here: the daemon delivers
+    /// notifications and records them in `RuntimeState.countdown_delivered`,
+    /// because it has to do so with no window open. These are populated from
+    /// that for display, and `roll_forward` clears them for symmetry -- the
+    /// daemon clears its own records when it sees the target move.
     pub fired: Vec<Reminder>,
-    /// Whether the arrival notification has been sent for the current target.
+    /// Whether arrival has been notified, mirrored from the daemon.
     pub arrived: bool,
 }
 

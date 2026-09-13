@@ -148,13 +148,12 @@ pub fn build_config_from_state(
         .events
         .iter()
         .map(|e| SavedCountdownEvent {
+            id: e.id,
             label: e.label.clone(),
             target: e.target,
             yearly: e.yearly,
             sound: e.sound.clone(),
             reminders: e.reminders.iter().map(|r| r.key().to_string()).collect(),
-            fired: e.fired.iter().map(|r| r.key().to_string()).collect(),
-            arrived: e.arrived,
         })
         .collect();
 
@@ -218,9 +217,8 @@ pub fn restore_chess(config: &Config) -> chess::ChessState {
 
 pub fn restore_countdowns(config: &Config) -> countdown::CountdownState {
     let mut state = countdown::CountdownState::default();
-    for (i, e) in config.countdown_events.iter().enumerate() {
-        let mut event =
-            countdown::CountdownEvent::new((i + 1) as u32, e.label.clone(), e.target);
+    for e in &config.countdown_events {
+        let mut event = countdown::CountdownEvent::new(e.id, e.label.clone(), e.target);
         event.yearly = e.yearly;
         event.sound = e.sound.clone();
         // Unknown reminder names are dropped rather than failing the load, so
@@ -230,12 +228,8 @@ pub fn restore_countdowns(config: &Config) -> countdown::CountdownState {
             .iter()
             .filter_map(|k| countdown::Reminder::from_key(k))
             .collect();
-        event.fired = e
-            .fired
-            .iter()
-            .filter_map(|k| countdown::Reminder::from_key(k))
-            .collect();
-        event.arrived = e.arrived;
+        // `fired` and `arrived` are the daemon's now -- they arrive through
+        // UpdateRuntime rather than from the config.
         state.events.push(event);
     }
     // From the highest id in use: positional ids collide after deletions.

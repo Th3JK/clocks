@@ -8,11 +8,9 @@ use crate::fl;
 use chrono::{Duration, Local, NaiveDate, Timelike};
 
 impl CountdownState {
-    /// Update and return (notification body, sound) pairs for reminders and
-    /// arrivals.
-    pub fn update(&mut self, message: Message) -> Vec<(String, String)> {
-        let mut notifications = Vec::new();
-
+    /// Returns nothing: reminders and arrivals are delivered by the daemon, so
+    /// this only mutates page state.
+    pub fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
                 let now = Local::now();
@@ -20,47 +18,15 @@ impl CountdownState {
                 // event that often is waste, and firing from it would deliver
                 // the same reminder up to ten times within one second.
                 if self.last_check.map(|t| t.timestamp()) == Some(now.timestamp()) {
-                    return notifications;
+                    return;
                 }
                 self.last_check = Some(now);
 
+                // Reminders and arrival are the daemon's -- it delivers them
+                // whether or not this window exists. What stays here is the
+                // yearly roll-forward, because it rewrites `target`, a
+                // definition field the GUI owns.
                 for event in &mut self.events {
-                    // Reminders, soonest threshold last so a long-passed event
-                    // doesn't emit a burst out of order.
-                    let mut due: Vec<Reminder> = event
-                        .reminders
-                        .iter()
-                        .copied()
-                        .filter(|r| {
-                            !event.fired.contains(r)
-                                && event.seconds_until(now) <= r.secs_before()
-                                && !event.has_passed(now)
-                        })
-                        .collect();
-                    due.sort_by_key(|r| std::cmp::Reverse(r.secs_before()));
-                    for reminder in due {
-                        event.fired.push(reminder);
-                        notifications.push((
-                            fl!(
-                                "countdown-reminder-body",
-                                label = event.label.clone(),
-                                when = reminder.display_name()
-                            ),
-                            event.sound.clone(),
-                        ));
-                    }
-
-                    // Arrival.
-                    if event.has_passed(now) && !event.arrived {
-                        event.arrived = true;
-                        notifications.push((
-                            fl!("countdown-arrived", label = event.label.clone()),
-                            event.sound.clone(),
-                        ));
-                    }
-
-                    // A yearly event re-arms itself for next year once it has
-                    // arrived, rather than counting up forever.
                     event.roll_forward(now);
                 }
             }
@@ -203,7 +169,5 @@ impl CountdownState {
                 self.dragging_index = None;
             }
         }
-
-        notifications
     }
 }
