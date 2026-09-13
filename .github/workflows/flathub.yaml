@@ -25,7 +25,7 @@ jobs:
       - name: Checkout Flathub manifest repo
         uses: actions/checkout@v4
         with:
-          repository: flathub/dev.edfloreshz.Tasks
+          repository: flathub/dev.th3jk.clocks
           path: flathub
           token: ${{ secrets.FLATHUB_PAT }}
 
@@ -50,7 +50,7 @@ jobs:
           MANIFEST="dev.th3jk.clocks.json"
 
           jq --arg commit "$RELEASE_COMMIT" \
-             '(.modules[] | select(.name == "tasks") | .sources) |=
+             '(.modules[] | select(.name == "clocks") | .sources) |=
                map(
                  if type == "object" and .type == "git" then
                    .commit = $commit
