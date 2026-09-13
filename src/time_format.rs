@@ -12,9 +12,10 @@ use cosmic_config::ConfigGet;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TimeFormat {
     /// Follow the desktop, falling back to the locale. See `resolve_use_12h`.
+    #[default]
     System,
     TwentyFour,
     Twelve,

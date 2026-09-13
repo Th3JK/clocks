@@ -89,13 +89,7 @@ impl cosmic::Application for AppModel {
         let countdown = restore_countdowns(&config);
         let (nav_order, nav_hidden) = restore_nav(&config);
 
-        // A config written before `time_format` existed carries `None`; fall back
-        // to the legacy flag so an existing user keeps the display they had.
-        let time_format = config.time_format.unwrap_or(if config.use_12h {
-            crate::time_format::TimeFormat::Twelve
-        } else {
-            crate::time_format::TimeFormat::TwentyFour
-        });
+        let time_format = config.time_format;
         let use_12h = time_format.use_12h();
         let confirm_delete_alarm = config.confirm_delete_alarm;
         let confirm_delete_timer = config.confirm_delete_timer;
@@ -746,11 +740,7 @@ impl cosmic::Application for AppModel {
             }
 
             Message::UpdateConfig(config) => {
-                self.time_format = config.time_format.unwrap_or(if config.use_12h {
-                    crate::time_format::TimeFormat::Twelve
-                } else {
-                    crate::time_format::TimeFormat::TwentyFour
-                });
+                self.time_format = config.time_format;
                 self.use_12h = self.time_format.use_12h();
                 self.confirm_delete_alarm = config.confirm_delete_alarm;
                 self.confirm_delete_timer = config.confirm_delete_timer;

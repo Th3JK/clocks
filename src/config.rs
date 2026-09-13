@@ -5,7 +5,7 @@ use cosmic_config::{CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
-#[version = 4]
+#[version = 5]
 pub struct Config {
     /// Saved world clocks (timezone names)
     pub world_clocks: Vec<SavedClock>,
@@ -17,16 +17,8 @@ pub struct Config {
     pub pomodoros: Vec<SavedPomodoro>,
     /// Pomodoro default durations
     pub pomodoro_defaults: PomodoroDefaults,
-    /// Legacy 12/24-hour flag, superseded by `time_format`.
-    ///
-    /// Kept so configs written before `time_format` existed still migrate: when
-    /// `time_format` is absent this value decides, preserving the user's
-    /// existing display rather than silently switching them to System.
-    pub use_12h: bool,
-    /// 24-hour, 12-hour, or follow the desktop. `None` means a config written
-    /// before this field existed â migrate from `use_12h`.
-    #[serde(default)]
-    pub time_format: Option<crate::time_format::TimeFormat>,
+    /// 24-hour, 12-hour, or follow the desktop.
+    pub time_format: crate::time_format::TimeFormat,
     /// Confirmation dialog settings (default: true = show confirmation)
     #[serde(default = "default_true")]
     pub confirm_delete_alarm: bool,
@@ -84,8 +76,7 @@ impl Default for Config {
             timers: Vec::new(),
             pomodoros: Vec::new(),
             pomodoro_defaults: PomodoroDefaults::default(),
-            use_12h: false,
-            time_format: Some(crate::time_format::TimeFormat::System),
+            time_format: crate::time_format::TimeFormat::System,
             confirm_delete_alarm: true,
             confirm_delete_timer: true,
             confirm_delete_world_clock: true,
@@ -112,7 +103,7 @@ pub struct SavedCountdownEvent {
     pub yearly: bool,
     pub sound: String,
     /// Reminder offsets, stored by name so the set can grow without breaking
-    /// existing configs â unknown names are dropped on load.
+    /// existing configs — unknown names are dropped on load.
     pub reminders: Vec<String>,
     #[serde(default)]
     pub fired: Vec<String>,
@@ -123,18 +114,8 @@ pub struct SavedCountdownEvent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedWorkout {
     pub label: String,
-    pub prep_secs: u32,
-    pub work_secs: u32,
-    pub rest_secs: u32,
-    pub rounds: u32,
-    pub sets: u32,
-    pub set_rest_secs: u32,
     pub sound: String,
-    /// Block structure. `None` marks a workout saved before blocks existed â
-    /// those are lowered from the six scalars above on restore. The scalars are
-    /// kept so a config written by this version still loads in an older build.
-    #[serde(default)]
-    pub blocks: Option<Vec<SavedBlock>>,
+    pub blocks: Vec<SavedBlock>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -199,14 +180,6 @@ pub struct SavedAlarm {
     pub sound: String,
     pub snooze_minutes: u8,
     pub ring_minutes: u8,
-    /// Wall-clock time a pending snooze re-rings, `None` when not snoozed.
-    ///
-    /// `#[serde(default)]` keeps configs written before this field existed
-    /// loadable. Note the struct `#[version]` must *not* be bumped for this:
-    /// cosmic-config puts the version in the directory path, so a bump would
-    /// start from an empty config and discard the user's existing data.
-    #[serde(default)]
-    pub snoozed_until: Option<chrono::DateTime<chrono::Local>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -218,6 +191,12 @@ pub enum SavedRepeatMode {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedTimer {
+    /// Stable identity, independent of list position. The daemon references a
+    /// running timer by id, so deriving it from position would re-point a live
+    /// run at a different timer the moment the list is reordered.
+    /// `0` means a config written before this field existed.
+    #[serde(default)]
+    pub id: u32,
     pub label: String,
     pub duration_secs: u64,
     pub repeat_enabled: bool,

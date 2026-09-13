@@ -66,11 +66,6 @@ pub fn build_config_from_state(
                 sound: a.sound.clone(),
                 snooze_minutes: a.snooze_minutes,
                 ring_minutes: a.ring_minutes,
-                snoozed_until: al
-                    .snoozed
-                    .iter()
-                    .find(|s| s.alarm_id == a.id)
-                    .map(|s| s.retrigger_at),
             }
         })
         .collect();
@@ -79,6 +74,7 @@ pub fn build_config_from_state(
         .timers
         .iter()
         .map(|t| SavedTimer {
+            id: t.id,
             label: t.label.clone(),
             duration_secs: t.initial_duration.as_secs(),
             repeat_enabled: t.repeat_enabled,
@@ -142,17 +138,8 @@ pub fn build_config_from_state(
         .iter()
         .map(|w| SavedWorkout {
             label: w.label.clone(),
-            // The legacy scalars are no longer the source of truth; they are
-            // written as a benign fallback so an older build can still open the
-            // config without seeing a zero-length workout.
-            prep_secs: 0,
-            work_secs: 30,
-            rest_secs: 10,
-            rounds: 8,
-            sets: 1,
-            set_rest_secs: 60,
             sound: w.sound.clone(),
-            blocks: Some(w.blocks.iter().map(save_block).collect()),
+            blocks: w.blocks.iter().map(save_block).collect(),
         })
         .collect();
 
@@ -179,8 +166,7 @@ pub fn build_config_from_state(
         // The legacy flag mirrors the preference only when it is concrete; a
         // System preference leaves it at its last explicit value so an older
         // build still gets something sensible.
-        use_12h: matches!(time_format, crate::time_format::TimeFormat::Twelve),
-        time_format: Some(time_format),
+        time_format,
         confirm_delete_alarm,
         confirm_delete_timer,
         confirm_delete_world_clock,
@@ -313,17 +299,7 @@ pub fn restore_workouts(config: &Config) -> workout::WorkoutState {
         // Workouts saved before blocks existed carry `None` here; lower their
         // six scalars into the equivalent block layout so they behave exactly
         // as they did before.
-        let blocks = match &w.blocks {
-            Some(blocks) => blocks.iter().map(load_block).collect(),
-            None => workout::simple_blocks(
-                w.prep_secs,
-                w.work_secs,
-                w.rest_secs,
-                w.rounds,
-                w.sets,
-                w.set_rest_secs,
-            ),
-        };
+        let blocks = w.blocks.iter().map(load_block).collect();
         state.workouts.push(workout::WorkoutEntry::new(
             (i + 1) as u32,
             w.label.clone(),
@@ -383,30 +359,10 @@ pub fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocksState {
 }
 
 pub fn restore_alarms(config: &Config) -> alarm::AlarmState {
-    // Resolve ids before building the entries. A config written before ids
-    // existed has every id at 0 and gets numbered from 1, which reproduces the
-    // old positional behaviour exactly for a one-time migration. After that the
-    // stored id wins, so reordering never renumbers anything.
-    let mut next_free = config.alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
-    let ids: Vec<u32> = config
-        .alarms
-        .iter()
-        .map(|a| {
-            if a.id == 0 {
-                let id = next_free;
-                next_free += 1;
-                id
-            } else {
-                a.id
-            }
-        })
-        .collect();
-
     let alarms: Vec<alarm::AlarmEntry> = config
         .alarms
         .iter()
-        .enumerate()
-        .map(|(i, a)| {
+        .map(|a| {
             let repeat_mode = match &a.repeat_mode {
                 SavedRepeatMode::Once => alarm::RepeatMode::Once,
                 SavedRepeatMode::EveryDay => alarm::RepeatMode::EveryDay,
@@ -431,20 +387,14 @@ pub fn restore_alarms(config: &Config) -> alarm::AlarmState {
                     }
                 }
             };
-            // Migrate "Default" sound to "Bell"
-            let sound = if a.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                a.sound.clone()
-            };
             alarm::AlarmEntry {
-                id: ids[i],
+                id: a.id,
                 hour: a.hour,
                 minute: a.minute,
                 label: a.label.clone(),
                 is_enabled: a.is_enabled,
                 repeat_mode,
-                sound,
+                sound: a.sound.clone(),
                 snooze_minutes: a.snooze_minutes,
                 ring_minutes: a.ring_minutes,
             }
@@ -455,27 +405,9 @@ pub fn restore_alarms(config: &Config) -> alarm::AlarmState {
     // `len() + 1` can collide with a live id.
     let next_id = alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
 
-    // Rebuild pending snoozes from the saved re-ring times. Everything else the
-    // snooze needs is already on the alarm itself, so only the time is stored.
-    // A snooze whose time passed while the app was closed is dropped rather than
-    // fired retroactively.
-    let now = chrono::Local::now();
-    let snoozed = config
-        .alarms
-        .iter()
-        .zip(alarms.iter())
-        .filter_map(|(s, entry)| {
-            let retrigger_at = s.snoozed_until?;
-            (retrigger_at > now).then(|| alarm::SnoozedAlarm {
-                alarm_id: entry.id,
-                label: entry.label.clone(),
-                sound: entry.sound.clone(),
-                ring_minutes: entry.ring_minutes,
-                snooze_minutes: entry.snooze_minutes,
-                retrigger_at,
-            })
-        })
-        .collect();
+    // Snoozes live in the daemon's runtime state, not here -- the GUI receives
+    // them through `Message::UpdateRuntime`.
+    let snoozed = Vec::new();
 
     alarm::AlarmState {
         alarms,
@@ -495,17 +427,10 @@ pub fn restore_timers(config: &Config) -> timer::TimerState {
     let timers: Vec<timer::TimerEntry> = config
         .timers
         .iter()
-        .enumerate()
-        .map(|(i, t)| {
+        .map(|t| {
             let dur = Duration::from_secs(t.duration_secs);
-            // Migrate "Default" sound to "Bell"
-            let sound = if t.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                t.sound.clone()
-            };
             timer::TimerEntry {
-                id: (i + 1) as u32,
+                id: t.id,
                 label: t.label.clone(),
                 initial_duration: dur,
                 remaining: dur,
@@ -515,12 +440,14 @@ pub fn restore_timers(config: &Config) -> timer::TimerState {
                 repeat_enabled: t.repeat_enabled,
                 repeat_count: t.repeat_count,
                 completed_count: 0,
-                sound,
+                sound: t.sound.clone(),
             }
         })
         .collect();
 
-    let next_id = timers.len() as u32 + 1;
+    // From the highest id in use, not the count: with deletions in play
+    // `len() + 1` collides with a live id.
+    let next_id = timers.iter().map(|t| t.id).max().unwrap_or(0) + 1;
 
     timer::TimerState {
         timers,
@@ -559,12 +486,7 @@ pub fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
                 p.short_break_minutes,
                 p.long_break_minutes,
             );
-            // Migrate "Default" sound to "Bell"
-            timer.sound = if p.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                p.sound.clone()
-            };
+            timer.sound = p.sound.clone();
             state.timers.push(timer);
         }
         state.next_id = config.pomodoros.len() as u32;

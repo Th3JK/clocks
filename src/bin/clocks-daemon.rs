@@ -294,32 +294,6 @@ fn tick(daemon: &Arc<Daemon>) {
     }
 }
 
-/// One-time import of snoozes that predate the runtime entry.
-///
-/// Snoozes used to live on the alarm itself as `snoozed_until`. Carry them
-/// across on first run so an upgrade mid-snooze does not drop it.
-fn import_legacy_snoozes(daemon: &Daemon, state: &mut RuntimeState) {
-    if !state.snoozed.is_empty() {
-        return;
-    }
-    let config = daemon.definitions();
-    let now = chrono::Local::now();
-    let alarms = clocks::app::persistence::restore_alarms(&config);
-    state.snoozed = alarms
-        .snoozed
-        .into_iter()
-        .filter(|s| s.retrigger_at > now)
-        .map(|s| clocks::runtime::SnoozeRecord {
-            alarm_id: s.alarm_id,
-            label: s.label,
-            sound: s.sound,
-            ring_minutes: s.ring_minutes,
-            snooze_minutes: s.snooze_minutes,
-            retrigger_at: s.retrigger_at,
-        })
-        .collect();
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
     clocks::i18n::init(&requested_languages);
@@ -339,8 +313,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         audio_stops: Mutex::new(HashMap::new()),
         last_persisted: Mutex::new(None),
     });
-
-    import_legacy_snoozes(&daemon, &mut state);
 
     // Nothing can still be ringing across a restart -- the audio thread died
     // with the old process. Anything that was is treated as unanswered and
