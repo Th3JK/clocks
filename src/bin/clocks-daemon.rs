@@ -13,7 +13,7 @@
 //! - An autostart entry, so it is running before the GUI ever opens.
 
 use clocks::config::Config;
-use clocks::runtime::{RingingRecord, RuntimeState};
+use clocks::runtime::{RingingRecord, RuntimeState, TimerRun};
 use clocks::{audio, ipc, scheduler};
 use cosmic_config::CosmicConfigEntry;
 use std::collections::HashMap;
@@ -104,6 +104,65 @@ impl Daemon {
         self.persist(&state);
     }
 
+    /// Look a timer definition up by id.
+    fn timer_def(&self, timer_id: u32) -> Option<clocks::config::SavedTimer> {
+        self.definitions()
+            .timers
+            .into_iter()
+            .find(|t| t.id == timer_id)
+    }
+
+    /// Apply a change to one timer's run state and persist.
+    ///
+    /// Every control goes through here so there is one place that writes, and
+    /// so the GUI's watcher sees exactly one update per command.
+    fn update_timers(&self, f: impl FnOnce(&mut Vec<TimerRun>)) {
+        let mut state = self.state.lock().expect("runtime state poisoned");
+        f(&mut state.timers);
+        self.persist(&state);
+    }
+
+    fn timer_start(&self, timer_id: u32) {
+        let Some(def) = self.timer_def(timer_id) else {
+            return;
+        };
+        let now = chrono::Local::now();
+        self.update_timers(|runs| {
+            runs.retain(|t| t.timer_id != timer_id);
+            runs.push(TimerRun {
+                timer_id,
+                deadline: Some(now + chrono::Duration::seconds(def.duration_secs as i64)),
+                remaining_secs: def.duration_secs,
+                completed: 0,
+            });
+        });
+    }
+
+    fn timer_pause(&self, timer_id: u32) {
+        let now = chrono::Local::now();
+        self.update_timers(|runs| {
+            if let Some(run) = runs.iter_mut().find(|t| t.timer_id == timer_id) {
+                run.remaining_secs = run.remaining_secs(now);
+                run.deadline = None;
+            }
+        });
+    }
+
+    fn timer_resume(&self, timer_id: u32) {
+        let now = chrono::Local::now();
+        self.update_timers(|runs| {
+            if let Some(run) = runs.iter_mut().find(|t| t.timer_id == timer_id)
+                && run.deadline.is_none()
+            {
+                run.deadline = Some(now + chrono::Duration::seconds(run.remaining_secs as i64));
+            }
+        });
+    }
+
+    fn timer_reset(&self, timer_id: u32) {
+        self.update_timers(|runs| runs.retain(|t| t.timer_id != timer_id));
+    }
+
     /// Ring an alarm: notification with actions, looping audio, recorded state.
     /// Takes `&Arc<Self>` so the notification thread can hold the daemon and
     /// answer Dismiss/Snooze without a bus round-trip.
@@ -191,6 +250,36 @@ fn open_app_at(page: clocks::pages::Page) {
     }
 }
 
+/// Post a notification whose body opens the app on `page`.
+///
+/// For things that have simply happened and need no answer -- a finished timer,
+/// a countdown reminder. A ringing alarm uses `notify` instead, which adds
+/// Dismiss and Snooze; the shared part is only the body behaviour.
+///
+/// The `default` action is what makes the body clickable at all: without it the
+/// server emits no ActionInvoked and merely closes the banner.
+fn notify_opening(page: clocks::pages::Page, summary: String, body: String) {
+    std::thread::spawn(move || {
+        let handle = notify_rust::Notification::new()
+            .summary(&summary)
+            .body(&body)
+            .icon("alarm-symbolic")
+            .action("default", &clocks::fl!("notification-open"))
+            .show();
+
+        match handle {
+            // Blocks until the user acts or the banner closes, which is why
+            // this needs its own thread.
+            Ok(handle) => handle.wait_for_action(|action| {
+                if action == "default" {
+                    open_app_at(page);
+                }
+            }),
+            Err(e) => eprintln!("clocks-daemon: notification failed: {e}"),
+        }
+    });
+}
+
 struct DaemonInterface(Arc<Daemon>);
 
 #[zbus::interface(name = "dev.th3jk.clocks.Daemon")]
@@ -201,6 +290,22 @@ impl DaemonInterface {
 
     fn snooze(&self, alarm_id: u32) {
         self.0.answer_snooze(alarm_id);
+    }
+
+    fn timer_start(&self, timer_id: u32) {
+        self.0.timer_start(timer_id);
+    }
+
+    fn timer_pause(&self, timer_id: u32) {
+        self.0.timer_pause(timer_id);
+    }
+
+    fn timer_resume(&self, timer_id: u32) {
+        self.0.timer_resume(timer_id);
+    }
+
+    fn timer_reset(&self, timer_id: u32) {
+        self.0.timer_reset(timer_id);
     }
 
     /// Nudge to re-read definitions. The scheduler reads them every tick, so
@@ -250,6 +355,45 @@ fn tick(daemon: &Arc<Daemon>) {
         );
     }
 
+    // Timers. Re-arming a repeat here is the point of the whole exercise: it is
+    // what keeps a repeating timer going with no window open.
+    let timer_defs = config.timers.clone();
+    let mut expired: Vec<(TimerRun, clocks::config::SavedTimer)> = Vec::new();
+    state.timers.retain_mut(|run| {
+        let Some(deadline) = run.deadline else {
+            return true;
+        };
+        if deadline > now {
+            return true;
+        }
+        let Some(def) = timer_defs.iter().find(|d| d.id == run.timer_id) else {
+            // Definition deleted while running -- drop the run rather than
+            // firing something with no label or sound.
+            return false;
+        };
+
+        run.completed += 1;
+        expired.push((run.clone(), def.clone()));
+
+        let repeats_left =
+            def.repeat_enabled && (def.repeat_count == 0 || run.completed < def.repeat_count);
+        if repeats_left {
+            run.deadline = Some(now + chrono::Duration::seconds(def.duration_secs as i64));
+            run.remaining_secs = def.duration_secs;
+            true
+        } else {
+            false
+        }
+    });
+    for (_run, def) in expired {
+        notify_opening(
+            clocks::pages::Page::Timer,
+            clocks::fl!("notification-timer-complete"),
+            def.label.clone(),
+        );
+        audio::play_sound(&def.sound);
+    }
+
     // Switching a spent one-shot back on in the GUI re-arms it. The GUI cannot
     // write here, so the daemon infers it from the definition being enabled.
     state
@@ -275,7 +419,8 @@ fn tick(daemon: &Arc<Daemon>) {
     // Something the GUI renders changed -- write immediately, it is watching.
     let substantive = state.ringing != before.ringing
         || state.snoozed != before.snoozed
-        || state.consumed_once != before.consumed_once;
+        || state.consumed_once != before.consumed_once
+        || state.timers != before.timers;
 
     // Or the checkpoint has drifted. This has to reach disk or the catch-up
     // window is wrong after a restart: `since` would fall back to `now` and

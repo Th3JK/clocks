@@ -44,6 +44,22 @@ pub struct SnoozeRecord {
     pub retrigger_at: chrono::DateTime<chrono::Local>,
 }
 
+/// A timer the daemon is counting down.
+///
+/// Wall clock rather than `std::time::Instant`, which is monotonic and resets
+/// per process: a timer that outlives the window cannot be described by one.
+/// This is also what lets a running timer survive a restart, which it never did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimerRun {
+    pub timer_id: u32,
+    /// Expiry while running; `None` when paused.
+    pub deadline: Option<chrono::DateTime<chrono::Local>>,
+    /// Authoritative only while paused -- while running, the deadline is.
+    pub remaining_secs: u64,
+    /// Repeats already fired, counted against `repeat_count`.
+    pub completed: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, CosmicConfigEntry)]
 #[version = 1]
 pub struct RuntimeState {
@@ -72,6 +88,11 @@ pub struct RuntimeState {
     /// fire anything that came due while it was not looking.
     #[serde(default)]
     pub checked_through: Option<chrono::DateTime<chrono::Local>>,
+
+    /// Timers the daemon is counting down. Definitions stay in `Config`; this
+    /// is only the running state, looked up by `timer_id`.
+    #[serde(default)]
+    pub timers: Vec<TimerRun>,
 }
 
 impl Default for RuntimeState {
@@ -81,6 +102,7 @@ impl Default for RuntimeState {
             snoozed: Vec::new(),
             consumed_once: Vec::new(),
             checked_through: None,
+            timers: Vec::new(),
         }
     }
 }
@@ -105,5 +127,30 @@ impl RuntimeState {
 
     pub fn snooze_for(&self, alarm_id: u32) -> Option<&SnoozeRecord> {
         self.snoozed.iter().find(|s| s.alarm_id == alarm_id)
+    }
+
+    pub fn timer(&self, timer_id: u32) -> Option<&TimerRun> {
+        self.timers.iter().find(|t| t.timer_id == timer_id)
+    }
+}
+
+impl TimerRun {
+    /// Seconds left, from the deadline while running and from the stored
+    /// remainder while paused. Saturates at zero rather than going negative.
+    #[must_use]
+    pub fn remaining_secs(&self, now: chrono::DateTime<chrono::Local>) -> u64 {
+        match self.deadline {
+            Some(deadline) => deadline
+                .signed_duration_since(now)
+                .num_seconds()
+                .max(0)
+                .unsigned_abs(),
+            None => self.remaining_secs,
+        }
+    }
+
+    #[must_use]
+    pub fn is_running(&self) -> bool {
+        self.deadline.is_some()
     }
 }

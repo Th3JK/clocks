@@ -23,12 +23,17 @@ impl AppModel {
             self.stopwatch.update(stopwatch::Message::Tick);
         }
 
-        // Timer tick + completion notifications
-        if self.timer.has_running_timers() {
-            let completed = self.timer.update(timer::Message::Tick);
-            for (label, sound) in completed {
-                audio::send_notification(&fl!("notification-timer-complete"), &label);
-                audio::play_sound(&sound);
+        // Timers: display only. The daemon owns the countdown and fires the
+        // notification, so this just recomputes what is on screen from the
+        // deadlines it published -- no `Instant`, and nothing to duplicate.
+        if !self.runtime.timers.is_empty() {
+            let now = Local::now();
+            for entry in &mut self.timer.timers {
+                if let Some(run) = self.runtime.timer(entry.id) {
+                    entry.is_running = run.is_running();
+                    entry.remaining = std::time::Duration::from_secs(run.remaining_secs(now));
+                    entry.completed_count = run.completed;
+                }
             }
         }
 

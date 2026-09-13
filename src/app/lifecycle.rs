@@ -30,6 +30,19 @@ use std::collections::HashMap;
 
 // --- Application trait (View + Update lifecycle) ---
 
+/// Send a command to the daemon without waiting for it.
+///
+/// Blocking zbus on a detached thread rather than a `Task`: the GUI does not
+/// need the result, because the state change comes back through the runtime
+/// watcher. Doing it inline would block the event loop on a D-Bus round-trip.
+fn daemon_call(call: impl FnOnce() -> Result<(), zbus::Error> + Send + 'static) {
+    std::thread::spawn(move || {
+        if let Err(e) = call() {
+            eprintln!("clocks: could not reach the daemon: {e}");
+        }
+    });
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = crate::flags::Flags;
@@ -113,6 +126,7 @@ impl cosmic::Application for AppModel {
             show_shortcuts_dialog: false,
             nav_order,
             nav_hidden,
+            runtime: crate::runtime::RuntimeState::default(),
             show_palette: false,
             palette_input: String::new(),
             pending_destructive_action: None,
@@ -482,19 +496,11 @@ impl cosmic::Application for AppModel {
                 // what stops the audio. Doing it here as well would race.
                 alarm::Message::SnoozeAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    std::thread::spawn(move || {
-                        if let Err(e) = crate::ipc::snooze(alarm_id) {
-                            eprintln!("clocks: could not reach the daemon: {e}");
-                        }
-                    });
+                    daemon_call(move || crate::ipc::snooze(alarm_id));
                 }
                 alarm::Message::DismissAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    std::thread::spawn(move || {
-                        if let Err(e) = crate::ipc::dismiss(alarm_id) {
-                            eprintln!("clocks: could not reach the daemon: {e}");
-                        }
-                    });
+                    daemon_call(move || crate::ipc::dismiss(alarm_id));
                 }
                 _ => {
                     self.alarm.update(msg.clone(), self.use_12h);
@@ -502,13 +508,40 @@ impl cosmic::Application for AppModel {
             },
 
             Message::Timer(ref msg) => match msg {
+                // The daemon owns running timers, so these are requests rather
+                // than state changes -- it is what keeps a timer counting down
+                // with the window closed. The resulting state comes back
+                // through the runtime watcher.
+                timer::Message::StartTimer(id) => {
+                    let id = *id;
+                    // Keyboard shortcuts act on the last timer touched.
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_start(id));
+                }
+                timer::Message::PauseTimer(id) => {
+                    let id = *id;
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_pause(id));
+                }
+                timer::Message::ResumeTimer(id) => {
+                    let id = *id;
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_resume(id));
+                }
+                timer::Message::ResetTimer(id) => {
+                    let id = *id;
+                    daemon_call(move || crate::ipc::timer_reset(id));
+                }
                 timer::Message::DeleteTimer(id) => {
+                    let id = *id;
                     if self.confirm_delete_timer && self.pending_destructive_action.is_none() {
-                        let id = *id;
                         self.pending_destructive_action = Some(DestructiveAction::DeleteTimer(id));
                         self.confirm_dialog_dont_show_again = false;
                         return Task::none();
                     }
+                    // Only once the delete is actually going ahead: stop it
+                    // counting down before the definition it refers to is gone.
+                    daemon_call(move || crate::ipc::timer_reset(id));
                     self.timer.update(msg.clone());
                     if self.context_page == ContextPage::TimerAdd {
                         self.timer.editing = false;
@@ -537,12 +570,6 @@ impl cosmic::Application for AppModel {
                         self.timer.update(msg.clone());
                     }
                     self.core.window.show_context = false;
-                }
-                timer::Message::StartTimer(id)
-                | timer::Message::PauseTimer(id)
-                | timer::Message::ResumeTimer(id) => {
-                    self.active_timer_id = Some(*id);
-                    self.timer.update(msg.clone());
                 }
                 timer::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Timer);
@@ -887,6 +914,27 @@ impl cosmic::Application for AppModel {
                         a.is_enabled = false;
                     }
                 }
+
+                // Project the daemon's timer runs onto the fields the timer
+                // views already read, so nothing downstream knows the countdown
+                // moved out of process.
+                let now = chrono::Local::now();
+                for entry in &mut self.timer.timers {
+                    match runtime.timer(entry.id) {
+                        Some(run) => {
+                            entry.is_running = run.is_running();
+                            entry.remaining =
+                                std::time::Duration::from_secs(run.remaining_secs(now));
+                            entry.completed_count = run.completed;
+                        }
+                        None => {
+                            entry.is_running = false;
+                            entry.remaining = entry.initial_duration;
+                            entry.completed_count = 0;
+                        }
+                    }
+                }
+                self.runtime = runtime.clone();
             }
 
             Message::MoveNavPage(from, to) => {
@@ -976,6 +1024,7 @@ impl cosmic::Application for AppModel {
                         }
                     }
                     Some(DestructiveAction::DeleteTimer(id)) => {
+                        daemon_call(move || crate::ipc::timer_reset(id));
                         self.timer.update(timer::Message::DeleteTimer(id));
                         if self.context_page == ContextPage::TimerAdd {
                             self.timer.editing = false;

@@ -75,6 +75,10 @@ pub struct AppModel {
     /// `nav_bar::Entity` - those go stale the moment the model is rebuilt.
     nav_order: Vec<crate::pages::Page>,
     nav_hidden: Vec<crate::pages::Page>,
+    /// Last runtime state seen from the daemon. Holds the wall-clock deadlines
+    /// the tick renders from, so the countdown stays smooth without a D-Bus
+    /// round-trip per frame.
+    runtime: crate::runtime::RuntimeState,
     /// Quick-action palette state (session-only).
     show_palette: bool,
     palette_input: String,

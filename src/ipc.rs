@@ -43,6 +43,26 @@ pub fn snooze(alarm_id: u32) -> Result<(), zbus::Error> {
     call_with_id("Snooze", alarm_id)
 }
 
+/// Start a timer from its full duration.
+pub fn timer_start(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("TimerStart", timer_id)
+}
+
+/// Pause a running timer, keeping the remainder.
+pub fn timer_pause(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("TimerPause", timer_id)
+}
+
+/// Resume a paused timer from where it stopped.
+pub fn timer_resume(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("TimerResume", timer_id)
+}
+
+/// Stop a timer and forget its progress.
+pub fn timer_reset(timer_id: u32) -> Result<(), zbus::Error> {
+    call_with_id("TimerReset", timer_id)
+}
+
 /// Ask the daemon to re-read alarm definitions.
 ///
 /// The daemon watches the config itself, so this is only a nudge for the case
