@@ -24,13 +24,85 @@ fn light_font() -> cosmic::iced::Font {
 }
 
 impl TimerState {
-    /// Main view: dispatches to card grid, edit mode, or empty state.
+    /// Main view: dispatches to focus mode, card grid, edit mode, or empty state.
     pub fn view(&self) -> Element<'_, Message> {
+        // Focus mode wins over every other mode. The id is re-looked-up rather
+        // than trusted: if it no longer resolves (deleted elsewhere) we fall back
+        // to the list instead of rendering a blank page.
+        if let Some(id) = self.focused_id
+            && let Some(timer) = self.timers.iter().find(|t| t.id == id)
+        {
+            return self.focus_view(timer);
+        }
         if self.edit_mode {
             self.edit_mode_view()
         } else {
             self.card_grid_view()
         }
+    }
+
+    /// Full-page view of a single timer: back header, large ring, controls.
+    fn focus_view<'a>(&'a self, timer: &'a TimerEntry) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let back = widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+            .on_press(Message::Unfocus);
+
+        let header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(back)
+            .push(
+                widget::container(widget::text::title3(&timer.label))
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill),
+            )
+            // Balances the back button so the title stays optically centred.
+            .push(widget::Space::new().width(40.0));
+
+        let progress = if timer.initial_duration.as_secs_f32() > 0.0 {
+            1.0 - (timer.remaining.as_secs_f32() / timer.initial_duration.as_secs_f32())
+        } else {
+            0.0
+        };
+
+        let circle_size = 280.0;
+        let circle = CircularProgress::new(progress)
+            .size(circle_size)
+            .stroke_width(10.0)
+            .track_color(Color::from_rgba(0.5, 0.5, 0.5, 0.15))
+            .fill_color(cosmic::theme::active().cosmic().accent_color().into())
+            .view();
+
+        let time_text = widget::text(format_duration_hms(timer.remaining))
+            .size(56.0)
+            .font(light_font());
+
+        let hero = widget::container(
+            cosmic::iced_widget::stack![
+                circle,
+                widget::container(time_text)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(circle_size)
+                    .height(circle_size),
+            ]
+            .width(circle_size)
+            .height(circle_size),
+        )
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+        widget::column::with_capacity(3)
+            .spacing(spacing.space_s)
+            .padding(spacing.space_xs)
+            .push(header)
+            .push(hero)
+            .push(self.card_controls(timer))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 
     /// Card grid view (base/view mode): page header + timer card grid or empty state.
@@ -164,14 +236,9 @@ impl TimerState {
                 style
             })));
 
-        // Entire card clickable when timer is not running
-        if !timer.is_running {
-            widget::mouse_area(card)
-                .on_press(Message::StartEditTimer(id))
-                .into()
-        } else {
-            card.into()
-        }
+        // Pressing the card enters focus mode, mirroring World Clocks' detail
+        // view. Editing moved to the pencil in the controls row and to edit mode.
+        widget::mouse_area(card).on_press(Message::Focus(id)).into()
     }
 
     /// Play/Pause and Reset controls for a timer card.
@@ -276,7 +343,28 @@ impl TimerState {
             .into()
         };
 
-        let left_spacer: Element<'_, Message> = invisible_btn();
+        // Edit affordance, now that pressing the card focuses instead of editing.
+        // Only offered when stopped: saving an edit resets the timer's duration.
+        let edit_btn: Option<Element<'_, Message>> = (!timer.is_running).then(|| {
+            widget::tooltip(
+                widget::button::custom(
+                    widget::container(
+                        widget::icon::from_name("edit-symbolic").size(16).icon(),
+                    )
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(32)
+                    .height(32),
+                )
+                .class(cosmic::theme::Button::Standard)
+                .on_press(Message::StartEditTimer(id)),
+                widget::text::body(fl!("edit-timer")),
+                widget::tooltip::Position::Top,
+            )
+            .into()
+        });
+
+        let left_spacer: Element<'_, Message> = edit_btn.unwrap_or_else(invisible_btn);
         let right_slot: Element<'_, Message> = reset_btn.unwrap_or_else(invisible_btn);
 
         widget::container(
@@ -499,9 +587,8 @@ impl TimerState {
 
     /// Shared empty state: centered timer icon + CTA button.
     fn empty_state(&self) -> Element<'_, Message> {
-        let icon = widget::icon::from_name("timer-symbolic")
+        let icon = widget::icon::icon(crate::app::bundled_icon(crate::app::TIMER_ICON))
             .size(128)
-            .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
                 |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),

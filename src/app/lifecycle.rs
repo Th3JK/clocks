@@ -68,12 +68,12 @@ impl cosmic::Application for AppModel {
         nav.insert()
             .text(fl!("nav-timer"))
             .data::<Page>(Page::Timer)
-            .icon(icon::from_name("appointment-soon-symbolic"));
+            .icon(icon::icon(super::bundled_icon(super::TIMER_ICON)));
 
         nav.insert()
             .text(fl!("nav-pomodoro"))
             .data::<Page>(Page::Pomodoro)
-            .icon(icon::from_name("appointment-soon-symbolic"));
+            .icon(icon::icon(super::bundled_icon(super::POMODORO_ICON)));
 
         nav.insert()
             .text(fl!("nav-chess"))
@@ -234,11 +234,18 @@ impl cosmic::Application for AppModel {
                 )
                 .title(title)
             }
-            ContextPage::PomodoroSettings => context_drawer::context_drawer(
-                self.pomodoro.settings_view().map(Message::Pomodoro),
-                Message::ToggleContextPage(ContextPage::PomodoroSettings),
-            )
-            .title(fl!("pomodoro-settings")),
+            ContextPage::PomodoroSettings => {
+                let title = if self.pomodoro.editing_id.is_some() {
+                    fl!("edit-pomodoro")
+                } else {
+                    fl!("new-pomodoro")
+                };
+                context_drawer::context_drawer(
+                    self.pomodoro.settings_view().map(Message::Pomodoro),
+                    Message::ToggleContextPage(ContextPage::PomodoroSettings),
+                )
+                .title(title)
+            }
             ContextPage::ChessSettings => context_drawer::context_drawer(
                 self.chess.settings_view().map(Message::Chess),
                 Message::ToggleContextPage(ContextPage::ChessSettings),
@@ -477,12 +484,15 @@ impl cosmic::Application for AppModel {
                 }
                 timer::Message::CancelEdit | timer::Message::SaveTimer => {
                     if matches!(msg, timer::Message::SaveTimer) {
-                        // Track the newly saved timer as active
-                        if let Some(t) = self.timer.timers.last() {
-                            self.active_timer_id = Some(t.id);
-                        }
+                        // Track the saved timer as active. When editing, that is
+                        // `edit_id`; only a freshly created timer is the last one.
+                        let edited = self.timer.edit_id;
+                        self.timer.update(msg.clone());
+                        self.active_timer_id =
+                            edited.or_else(|| self.timer.timers.last().map(|t| t.id));
+                    } else {
+                        self.timer.update(msg.clone());
                     }
-                    self.timer.update(msg.clone());
                     self.core.window.show_context = false;
                 }
                 timer::Message::StartTimer(id)
@@ -570,13 +580,22 @@ impl cosmic::Application for AppModel {
                     self.save_state();
                     return widget::text_input::focus(widget::Id::new("pomodoro-label-input"));
                 }
-                pomodoro::Message::CancelEditPomodoro | pomodoro::Message::SaveEditPomodoro => {
-                    if matches!(msg, pomodoro::Message::SaveEditPomodoro)
+                pomodoro::Message::CancelEditPomodoro
+                | pomodoro::Message::SaveEditPomodoro
+                | pomodoro::Message::AddTimer => {
+                    // The saved timer is the one being edited, not the last in the
+                    // list. `AddTimer` appends, so there `last()` is correct.
+                    if matches!(msg, pomodoro::Message::SaveEditPomodoro) {
+                        self.active_pomodoro_id = self.pomodoro.editing_id;
+                    }
+                    self.pomodoro.update(msg.clone());
+                    if matches!(msg, pomodoro::Message::AddTimer)
                         && let Some(p) = self.pomodoro.timers.last()
                     {
                         self.active_pomodoro_id = Some(p.id);
                     }
-                    self.pomodoro.update(msg.clone());
+                    // Close the drawer on every terminal action. `AddTimer`
+                    // previously fell through to the catch-all and left it open.
                     self.core.window.show_context = false;
                 }
                 pomodoro::Message::Start(id)

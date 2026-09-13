@@ -381,6 +381,7 @@ pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
         edit_mode: false,
         dragging_index: None,
         pre_drag_order: Vec::new(),
+        focused_id: None,
     }
 }
 

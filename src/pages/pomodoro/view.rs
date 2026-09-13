@@ -37,13 +37,114 @@ fn format_focus(secs: u64) -> String {
 }
 
 impl PomodoroState {
-    /// Main view: dispatches to card grid or edit mode.
+    /// Main view: dispatches to focus mode, card grid, or edit mode.
     pub fn view(&self) -> Element<'_, Message> {
+        // Focus mode wins over every other mode. The id is re-looked-up rather
+        // than trusted: if it no longer resolves (deleted elsewhere) we fall back
+        // to the list instead of rendering a blank page.
+        if let Some(id) = self.focused_id
+            && let Some(timer) = self.timers.iter().find(|t| t.id == id)
+        {
+            return self.focus_view(timer);
+        }
         if self.edit_mode {
             self.edit_mode_view()
         } else {
             self.card_grid_view()
         }
+    }
+
+    /// Full-page view of a single pomodoro: back header, large ring, session info.
+    fn focus_view<'a>(&'a self, timer: &'a PomodoroTimer) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let back = widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+            .on_press(Message::Unfocus);
+
+        let header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(back)
+            .push(
+                widget::container(widget::text::title3(&timer.label))
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill),
+            )
+            // Balances the back button so the title stays optically centred.
+            .push(widget::Space::new().width(40.0));
+
+        let total = timer.session_total().as_secs_f32();
+        let progress = if total > 0.0 {
+            1.0 - (timer.remaining.as_secs_f32() / total)
+        } else {
+            0.0
+        };
+
+        // Work sessions use the accent colour, breaks a neutral tone — the same
+        // convention the workout page uses to distinguish effort from recovery.
+        let cosmic = cosmic::theme::active();
+        let fill_color: Color = if timer.session_type == SessionType::Work {
+            cosmic.cosmic().accent_color().into()
+        } else {
+            cosmic.cosmic().palette.neutral_6.into()
+        };
+
+        let circle_size = 280.0;
+        let circle = CircularProgress::new(progress)
+            .size(circle_size)
+            .stroke_width(10.0)
+            .track_color(Color::from_rgba(0.5, 0.5, 0.5, 0.15))
+            .fill_color(fill_color)
+            .view();
+
+        let time_text = widget::text(format_duration_hms(timer.remaining))
+            .size(56.0)
+            .font(light_font());
+
+        let hero = widget::container(
+            cosmic::iced_widget::stack![
+                circle,
+                widget::container(time_text)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(circle_size)
+                    .height(circle_size),
+            ]
+            .width(circle_size)
+            .height(circle_size),
+        )
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+        let session = widget::container(widget::text::body(fl!(
+            "session-info",
+            number = timer.session_number.to_string(),
+            session_type = timer.session_type.display_name()
+        )))
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        let progress_info = widget::container(widget::text::caption(fl!(
+            "progress-info",
+            completed = timer.completed_work_sessions.to_string(),
+            target = timer.target_sessions.to_string(),
+            focused = (timer.total_focused_secs / 60).to_string()
+        )))
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        widget::column::with_capacity(5)
+            .spacing(spacing.space_s)
+            .padding(spacing.space_xs)
+            .push(header)
+            .push(hero)
+            .push(session)
+            .push(progress_info)
+            .push(self.card_controls(timer))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 
     /// Base view: header + stats + card grid (or empty state).
@@ -79,6 +180,21 @@ impl PomodoroState {
         col.into()
     }
 
+    /// Common height for the three cards in `stats_row`, derived from the tallest
+    /// content (the weekly chart) so all three line up. `flex_row` will not level
+    /// them for us — see the note on `themed_card`.
+    fn stats_card_height() -> f32 {
+        let spacing = cosmic::theme::spacing();
+        // Approximate rendered height of a `text::caption` line.
+        const CAPTION_HEIGHT: f32 = 16.0;
+        f32::from(spacing.space_s) * 2.0      // card padding, top + bottom
+            + CAPTION_HEIGHT                  // card title
+            + f32::from(spacing.space_xxs)    // title -> body gap
+            + BAR_MAX_HEIGHT                  // chart bars
+            + f32::from(spacing.space_xxxs)   // bars -> weekday label gap
+            + CAPTION_HEIGHT // weekday labels
+    }
+
     /// Row of statistics cards: focus today, current streak, and a weekly bar chart.
     fn stats_row(&self) -> Element<'_, Message> {
         let spacing = cosmic::theme::spacing();
@@ -105,7 +221,11 @@ impl PomodoroState {
             .push(widget::text::caption(title))
             .push(widget::text(value).size(24.0).font(light_font()));
 
-        themed_card(col.into(), spacing.space_s)
+        themed_card(
+            col.into(),
+            spacing.space_s,
+            Length::Fixed(Self::stats_card_height()),
+        )
     }
 
     /// Weekly focus trend as a 7-bar mini chart.
@@ -116,12 +236,11 @@ impl PomodoroState {
         let days = self.last_7_days();
         let max = days.iter().map(|(_, s)| *s).max().unwrap_or(0).max(1);
 
-        let bar_max_height = 40.0_f32;
         let bars: Vec<Element<'_, Message>> = days
             .iter()
             .map(|(label, secs)| {
                 let frac = *secs as f32 / max as f32;
-                let bar_height = (frac * bar_max_height).max(2.0);
+                let bar_height = (frac * BAR_MAX_HEIGHT).max(2.0);
                 let accent: Color = accent.into();
 
                 let bar = widget::container(widget::Space::new().width(Length::Fill))
@@ -140,7 +259,7 @@ impl PomodoroState {
 
                 // Anchor the bar to the bottom of a fixed-height area.
                 let bar_area = widget::container(bar)
-                    .height(Length::Fixed(bar_max_height))
+                    .height(Length::Fixed(BAR_MAX_HEIGHT))
                     .align_y(Alignment::End)
                     .width(Length::Fill);
 
@@ -163,7 +282,11 @@ impl PomodoroState {
             .push(widget::text::caption(fl!("stat-this-week")))
             .push(chart);
 
-        themed_card(col.into(), spacing.space_s)
+        themed_card(
+            col.into(),
+            spacing.space_s,
+            Length::Fixed(Self::stats_card_height()),
+        )
     }
 
     /// A single pomodoro timer card with circular progress, session info, and controls.
@@ -254,14 +377,9 @@ impl PomodoroState {
                 style
             })));
 
-        // Whole card opens the settings sidebar when the timer is not running.
-        if !timer.is_running {
-            widget::mouse_area(card)
-                .on_press(Message::StartEditPomodoro(id))
-                .into()
-        } else {
-            card.into()
-        }
+        // Pressing the card enters focus mode, mirroring World Clocks' detail
+        // view. Editing moved to the pencil in the controls row.
+        widget::mouse_area(card).on_press(Message::Focus(id)).into()
     }
 
     /// Reset (left) + Play/Pause (center) + Skip (right). Mirrors the Timer card
@@ -311,10 +429,12 @@ impl PomodoroState {
             widget::tooltip::Position::Top,
         );
 
-        let small_btn = |icon: &str, tip: String, msg: Message| -> Element<'_, Message> {
+        // Takes a built `Icon` rather than a theme name so callers can pass a
+        // bundled SVG for glyphs the icon theme may not have.
+        let small_btn = |icon: widget::icon::Icon, tip: String, msg: Message| -> Element<'_, Message> {
             widget::tooltip(
                 widget::button::custom(
-                    widget::container(widget::icon::from_name(icon).size(16).icon())
+                    widget::container(icon.size(16))
                         .align_x(Alignment::Center)
                         .align_y(Alignment::Center)
                         .width(32)
@@ -328,30 +448,26 @@ impl PomodoroState {
             .into()
         };
 
-        let invisible_btn = || -> Element<'_, Message> {
-            widget::button::custom(
-                widget::container(widget::Space::new())
-                    .align_x(Alignment::Center)
-                    .align_y(Alignment::Center)
-                    .width(32)
-                    .height(32),
-            )
-            .class(cosmic::theme::Button::Custom {
-                active: Box::new(|_, _| widget::button::Style::default()),
-                disabled: Box::new(|_| widget::button::Style::default()),
-                hovered: Box::new(|_, _| widget::button::Style::default()),
-                pressed: Box::new(|_, _| widget::button::Style::default()),
-            })
-            .into()
-        };
-
+        // Reset takes priority once started; before that the slot carries the edit
+        // affordance that pressing the card used to provide.
         let left_slot: Element<'_, Message> = if timer.has_started() {
-            small_btn("edit-undo-symbolic", fl!("tooltip-reset"), Message::Reset(id))
+            small_btn(
+                widget::icon::from_name("edit-undo-symbolic").icon(),
+                fl!("tooltip-reset"),
+                Message::Reset(id),
+            )
         } else {
-            invisible_btn()
+            small_btn(
+                widget::icon::from_name("edit-symbolic").icon(),
+                fl!("edit-pomodoro"),
+                Message::StartEditPomodoro(id),
+            )
         };
-        let skip_slot: Element<'_, Message> =
-            small_btn("media-skip-forward-symbolic", fl!("tooltip-skip"), Message::Skip(id));
+        let skip_slot: Element<'_, Message> = small_btn(
+            widget::icon::from_name("media-skip-forward-symbolic").icon(),
+            fl!("tooltip-skip"),
+            Message::Skip(id),
+        );
 
         widget::container(
             widget::row::with_capacity(3)
@@ -548,9 +664,8 @@ impl PomodoroState {
 
     /// Centered empty state: large icon + create button.
     fn empty_state(&self) -> Element<'_, Message> {
-        let icon = widget::icon::from_name("appointment-soon-symbolic")
+        let icon = widget::icon::icon(crate::app::bundled_icon(crate::app::POMODORO_ICON))
             .size(128)
-            .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
                 |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
@@ -578,7 +693,6 @@ impl PomodoroState {
 
         if let Some(_edit_id) = self.editing_id {
             // Editing existing pomodoro timer
-            col = col.push(widget::text::title4(fl!("edit-pomodoro")));
             col = col.push(
                 widget::text_input(fl!("label"), &self.edit_label)
                     .id(widget::Id::new("pomodoro-label-input"))
@@ -643,19 +757,30 @@ impl PomodoroState {
             ));
 
             col = col.push(widget::divider::horizontal::default());
-            let actions = widget::row::with_capacity(2)
+            let mut actions = widget::row::with_capacity(3)
                 .spacing(8)
                 .push(widget::button::standard(fl!("cancel")).on_press(Message::CancelEditPomodoro))
                 .push(widget::button::suggested(fl!("save")).on_press(Message::SaveEditPomodoro));
+            if let Some(edit_id) = self.editing_id {
+                actions = actions
+                    .push(widget::button::destructive(fl!("delete")).on_press(Message::Delete(edit_id)));
+            }
             col = col.push(actions);
         } else {
             // Add new timer
-            col = col.push(widget::text::title4(fl!("new-pomodoro")));
             col = col.push(
                 widget::text_input(fl!("label-placeholder-pomodoro"), &self.edit_label)
                     .id(widget::Id::new("pomodoro-label-input"))
                     .on_input(Message::EditNewLabel),
             );
+            // Sound for the timer about to be created. Without this the chosen
+            // sound can't be set at creation time and every new pomodoro is "Bell".
+            col = col.push(sound_selector_view(
+                fl!("sound"),
+                &self.edit_sound,
+                Message::EditSound,
+                Message::BrowseCustomSound,
+            ));
             col = col.push(widget::button::suggested(fl!("add-timer")).on_press(Message::AddTimer));
 
             col = col.push(widget::divider::horizontal::default());
@@ -716,11 +841,21 @@ impl PomodoroState {
     }
 }
 
-/// Wrap content in a themed primary card container with the given padding.
-fn themed_card(content: Element<'_, Message>, padding: u16) -> Element<'_, Message> {
+/// Wrap content in a themed primary card container with the given padding and height.
+///
+/// Height is explicit rather than `Fill`: `flex_row` maps a `Fill` child to a
+/// taffy `auto` size and then computes layout against the *available* height,
+/// not the content height. Since `card_grid_view`'s column is itself `Fill`,
+/// that available height is the whole page, so `align-items: stretch` inflates
+/// the cards and pushes the timer grid off-screen.
+/// Height of the bar area in the weekly focus chart.
+const BAR_MAX_HEIGHT: f32 = 40.0;
+
+fn themed_card(content: Element<'_, Message>, padding: u16, height: Length) -> Element<'_, Message> {
     widget::container(content)
         .padding(padding)
         .width(Length::Fill)
+        .height(height)
         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
             let mut style = cosmic::iced_widget::container::Catalog::style(
                 theme,

@@ -14,6 +14,9 @@ pub enum Message {
     Skip(u32),
     Reset(u32),
     Delete(u32),
+    // Focus mode (single pomodoro, full page)
+    Focus(u32),
+    Unfocus,
     // Settings sidebar
     OpenSettings,
     AddTimer,
