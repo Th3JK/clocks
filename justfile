@@ -95,13 +95,13 @@ install-daemon-local profile='debug':
     cargo build {{ if profile == 'release' { '--release' } else { '' } }} --bin {{daemon-name}}
     mkdir -p {{ local-data-dir / 'dbus-1' / 'services' }}
     printf '[D-BUS Service]\nName=dev.th3jk.clocks.Daemon\nExec=%s\n' \
-        {{ cargo-target-dir / profile / daemon-name }} \
+        {{ absolute_path(cargo-target-dir / profile / daemon-name) }} \
         > {{ local-data-dir / 'dbus-1' / 'services' / (appid + '.Daemon.service') }}
     mkdir -p {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' }}
     printf '[Desktop Entry]\nType=Application\nName=Clocks alarms\nExec=%s\nTerminal=false\nNoDisplay=true\n' \
-        {{ cargo-target-dir / profile / daemon-name }} \
+        {{ absolute_path(cargo-target-dir / profile / daemon-name) }} \
         > {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' / (appid + '.Daemon.desktop') }}
-    @echo "Registered. D-Bus will now start {{ cargo-target-dir / profile / daemon-name }} on demand."
+    @echo "Registered. D-Bus will now start {{ absolute_path(cargo-target-dir / profile / daemon-name) }} on demand."
 
 # Run the application for testing purposes
 run *args: install-local

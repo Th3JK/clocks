@@ -82,13 +82,32 @@ impl Daemon {
         }
     }
 
+    /// Stop an alarm ringing. Shared by the D-Bus method and the notification's
+    /// own Dismiss button.
+    fn answer_dismiss(&self, alarm_id: u32) {
+        self.stop_audio(alarm_id);
+        let mut state = self.state.lock().expect("runtime state poisoned");
+        scheduler::dismiss(&mut state, alarm_id);
+        self.persist(&state);
+    }
+
+    /// Stop an alarm ringing and re-ring after its snooze interval.
+    fn answer_snooze(&self, alarm_id: u32) {
+        self.stop_audio(alarm_id);
+        let mut state = self.state.lock().expect("runtime state poisoned");
+        scheduler::snooze(&mut state, alarm_id, chrono::Local::now());
+        self.persist(&state);
+    }
+
     /// Ring an alarm: notification with actions, looping audio, recorded state.
-    fn start_ringing(&self, state: &mut RuntimeState, due: scheduler::DueAlarm) {
+    /// Takes `&Arc<Self>` so the notification thread can hold the daemon and
+    /// answer Dismiss/Snooze without a bus round-trip.
+    fn start_ringing(self: &Arc<Self>, state: &mut RuntimeState, due: scheduler::DueAlarm) {
         if state.is_ringing(due.alarm_id) {
             return;
         }
 
-        notify(due.alarm_id, &due.label);
+        notify(Arc::clone(self), due.alarm_id, &due.label);
         self.start_audio(due.alarm_id, &due.sound, due.ring_secs);
 
         state.ringing.push(RingingRecord {
@@ -107,7 +126,7 @@ impl Daemon {
 /// With no window open the notification is the *only* way to answer an alarm,
 /// so Dismiss and Snooze have to live here. `wait_for_action` blocks until the
 /// user acts or the notification closes, hence the thread.
-fn notify(alarm_id: u32, label: &str) {
+fn notify(daemon: Arc<Daemon>, alarm_id: u32, label: &str) {
     let body = label.to_string();
     std::thread::spawn(move || {
         let handle = notify_rust::Notification::new()
@@ -122,15 +141,13 @@ fn notify(alarm_id: u32, label: &str) {
 
         match handle {
             Ok(handle) => handle.wait_for_action(|action| match action {
-                // Answering from the notification goes back through D-Bus
-                // rather than touching state directly, so it takes exactly the
-                // same path as the GUI's buttons.
-                "dismiss" => {
-                    let _ = ipc::dismiss(alarm_id);
-                }
-                "snooze" => {
-                    let _ = ipc::snooze(alarm_id);
-                }
+                // Called directly, *not* back through D-Bus. This closure runs
+                // inside notify-rust's own zbus runtime, and a blocking zbus
+                // call from there panics with "Cannot start a runtime from
+                // within a runtime". The daemon has no business calling itself
+                // over the bus anyway.
+                "dismiss" => daemon.answer_dismiss(alarm_id),
+                "snooze" => daemon.answer_snooze(alarm_id),
                 // Closing the notification is not an answer -- the alarm keeps
                 // ringing until its window expires and it auto-snoozes.
                 _ => {}
@@ -145,17 +162,11 @@ struct DaemonInterface(Arc<Daemon>);
 #[zbus::interface(name = "dev.th3jk.clocks.Daemon")]
 impl DaemonInterface {
     fn dismiss(&self, alarm_id: u32) {
-        self.0.stop_audio(alarm_id);
-        let mut state = self.0.state.lock().expect("runtime state poisoned");
-        scheduler::dismiss(&mut state, alarm_id);
-        self.0.persist(&state);
+        self.0.answer_dismiss(alarm_id);
     }
 
     fn snooze(&self, alarm_id: u32) {
-        self.0.stop_audio(alarm_id);
-        let mut state = self.0.state.lock().expect("runtime state poisoned");
-        scheduler::snooze(&mut state, alarm_id, chrono::Local::now());
-        self.0.persist(&state);
+        self.0.answer_snooze(alarm_id);
     }
 
     /// Nudge to re-read definitions. The scheduler reads them every tick, so
