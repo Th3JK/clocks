@@ -176,7 +176,7 @@ impl AppModel {
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                         let cosmic = theme.cosmic();
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -508,7 +508,7 @@ impl AppModel {
 
     pub(super) fn shortcut_row<'a>(action: String, keys: &'a [&'a str]) -> Element<'a, Message> {
         use cosmic::iced::widget::container as iced_container;
-        use cosmic::iced_core::{Background, Border};
+        use cosmic::iced::core::{Background, Border};
 
         let keys_row = keys.iter().fold(
             widget::row::with_capacity(keys.len() * 2)
@@ -526,10 +526,10 @@ impl AppModel {
                         let cosmic = theme.cosmic();
                         iced_container::Style {
                             background: Some(Background::Color(
-                                cosmic.background.component.hover.into(),
+                                cosmic.background(false).component.hover.into(),
                             )),
                             border: Border {
-                                color: cosmic.background.component.divider.into(),
+                                color: cosmic.background(false).component.divider.into(),
                                 width: 1.0,
                                 radius: cosmic.corner_radii.radius_xs.into(),
                             },

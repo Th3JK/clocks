@@ -23,7 +23,7 @@ use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::Length;
 use cosmic::iced::Subscription;
-use cosmic::iced_futures::event::listen_raw;
+use cosmic::iced::event::listen_raw;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::prelude::*;
 use std::collections::HashMap;

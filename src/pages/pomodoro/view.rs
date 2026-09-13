@@ -101,7 +101,7 @@ impl PomodoroState {
             .font(light_font());
 
         let hero = widget::container(
-            cosmic::iced_widget::stack![
+            cosmic::iced::widget::stack![
                 circle,
                 widget::container(time_text)
                     .align_x(Alignment::Center)
@@ -247,7 +247,7 @@ impl PomodoroState {
                     .width(Length::Fill)
                     .height(Length::Fixed(bar_height))
                     .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
-                        cosmic::iced_widget::container::Style {
+                        cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Background::Color(accent)),
                             border: cosmic::iced::Border {
                                 radius: theme.cosmic().radius_xs().into(),
@@ -317,7 +317,7 @@ impl PomodoroState {
             .font(light_font());
 
         let circle_with_time = widget::container(
-            cosmic::iced_widget::stack![
+            cosmic::iced::widget::stack![
                 circle,
                 widget::container(time_text)
                     .align_x(Alignment::Center)
@@ -368,7 +368,7 @@ impl PomodoroState {
             .width(Length::Fill)
             .max_width(340.0)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -513,7 +513,7 @@ impl PomodoroState {
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                             let accent = Color::from(theme.cosmic().accent_color());
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(accent)),
                                 border: cosmic::iced::Border {
                                     radius: 2.0.into(),
@@ -533,7 +533,7 @@ impl PomodoroState {
                         .size(16)
                         .icon()
                         .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                            |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                            |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().palette.neutral_7.into()),
                             },
                         )))
@@ -562,7 +562,7 @@ impl PomodoroState {
                     .padding(8)
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -614,7 +614,7 @@ impl PomodoroState {
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                         let accent = Color::from(theme.cosmic().accent_color());
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -627,7 +627,7 @@ impl PomodoroState {
                     })))
                     .into();
 
-                (card, cosmic::iced_core::widget::tree::State::None, offset)
+                (card, cosmic::iced::core::widget::tree::State::None, offset)
             });
 
         col = col.push(reorder_list);
@@ -667,7 +667,7 @@ impl PomodoroState {
         let icon = widget::icon::icon(crate::app::bundled_icon(crate::app::POMODORO_ICON))
             .size(128)
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
@@ -857,7 +857,7 @@ fn themed_card(content: Element<'_, Message>, padding: u16, height: Length) -> E
         .width(Length::Fill)
         .height(height)
         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-            let mut style = cosmic::iced_widget::container::Catalog::style(
+            let mut style = cosmic::iced::widget::container::Catalog::style(
                 theme,
                 &cosmic::theme::Container::Primary,
             );

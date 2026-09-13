@@ -228,7 +228,7 @@ impl ChessState {
             .height(Length::Fill)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                 let cosmic = theme.cosmic();
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -279,7 +279,7 @@ impl ChessState {
             .width(Length::FillPortion(filled_portion))
             .height(Length::Fixed(6.0))
             .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
-                cosmic::iced_widget::container::Style {
+                cosmic::iced::widget::container::Style {
                     background: Some(cosmic::iced::Background::Color(bar_fill)),
                     border: cosmic::iced::Border {
                         radius: theme.cosmic().radius_xs().into(),
@@ -335,7 +335,7 @@ impl ChessState {
             .height(Length::Fixed(220.0))
             .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
                 let cosmic = theme.cosmic();
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );

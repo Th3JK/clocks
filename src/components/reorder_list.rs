@@ -24,10 +24,10 @@ use cosmic::iced::clipboard::dnd::{DndAction, DndDestinationRectangle, DndEvent,
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::id::Internal;
 use cosmic::iced::{mouse, overlay, touch, Length, Point, Rectangle, Size, Vector};
-use cosmic::iced_core::clipboard::IconSurface;
-use cosmic::iced_core::widget::{tree, Operation, Tree};
-use cosmic::iced_core::{self, layout, renderer, Clipboard, Shell};
-use cosmic::iced_runtime::core::id::Id;
+use cosmic::iced::core::clipboard::IconSurface;
+use cosmic::iced::core::widget::{tree, Operation, Tree};
+use cosmic::iced::core::{self as iced_core, layout, renderer, Clipboard, Shell};
+use cosmic::iced::core::id::Id;
 use cosmic::prelude::*;
 use cosmic::{theme, widget};
 
@@ -221,7 +221,7 @@ struct ReorderWidgetState {
     cached_size: Option<Size>,
 }
 
-impl<Message: Clone + 'static> cosmic::iced_core::Widget<Message, cosmic::Theme, cosmic::Renderer>
+impl<Message: Clone + 'static> cosmic::iced::core::Widget<Message, cosmic::Theme, cosmic::Renderer>
     for ReorderList<'_, Message>
 {
     fn tag(&self) -> tree::Tag {

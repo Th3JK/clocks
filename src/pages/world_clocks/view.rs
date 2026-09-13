@@ -156,7 +156,7 @@ impl WorldClocksState {
                 let time_pill =
                     widget::container(widget::text::title4(time_str).font(cosmic::font::bold()))
                         .class(cosmic::theme::Container::custom(move |_theme| {
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(pill_bg)),
                                 border: cosmic::iced::Border {
                                     radius: 8.0.into(),
@@ -232,7 +232,7 @@ impl WorldClocksState {
                             .class(cosmic::theme::Container::Custom(Box::new(
                                 |theme| {
                                     let accent = Color::from(theme.cosmic().accent_color());
-                                    cosmic::iced_widget::container::Style {
+                                    cosmic::iced::widget::container::Style {
                                         background: Some(
                                             cosmic::iced::Background::Color(accent),
                                         ),
@@ -262,7 +262,7 @@ impl WorldClocksState {
                         widget::text::title4(time_str).font(cosmic::font::bold()),
                     )
                     .class(cosmic::theme::Container::custom(move |_theme| {
-                        cosmic::iced_widget::container::Style {
+                        cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Background::Color(pill_bg)),
                             border: cosmic::iced::Border {
                                 radius: 8.0.into(),
@@ -284,7 +284,7 @@ impl WorldClocksState {
                                 .size(16)
                                 .icon()
                                 .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                    |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                         color: Some(theme.cosmic().palette.neutral_7.into()),
                                     },
                                 )))
@@ -329,7 +329,7 @@ impl WorldClocksState {
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(
                             move |theme| {
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -385,7 +385,7 @@ impl WorldClocksState {
                             widget::text::title4(time_str).font(cosmic::font::bold()),
                         )
                         .class(cosmic::theme::Container::custom(move |_theme| {
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(pill_bg)),
                                 border: cosmic::iced::Border {
                                     radius: 8.0.into(),
@@ -418,7 +418,7 @@ impl WorldClocksState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -432,7 +432,7 @@ impl WorldClocksState {
                             })))
                             .into();
 
-                        (card, cosmic::iced_core::widget::tree::State::None, offset)
+                        (card, cosmic::iced::core::widget::tree::State::None, offset)
                     });
 
                 col = col.push(reorder_list);
@@ -477,7 +477,7 @@ impl WorldClocksState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));

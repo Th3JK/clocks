@@ -125,7 +125,7 @@ impl AlarmState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                cosmic::iced_widget::container::Style {
+                                cosmic::iced::widget::container::Style {
                                     background: Some(cosmic::iced::Background::Color(accent)),
                                     border: cosmic::iced::Border {
                                         radius: 2.0.into(),
@@ -150,7 +150,7 @@ impl AlarmState {
                                 .size(16)
                                 .icon()
                                 .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                    |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                         color: Some(theme.cosmic().palette.neutral_7.into()),
                                     },
                                 )))
@@ -195,7 +195,7 @@ impl AlarmState {
                         .padding(8)
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
-                            let mut style = cosmic::iced_widget::container::Catalog::style(
+                            let mut style = cosmic::iced::widget::container::Catalog::style(
                                 theme,
                                 &cosmic::theme::Container::Primary,
                             );
@@ -269,7 +269,7 @@ impl AlarmState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -282,7 +282,7 @@ impl AlarmState {
                             })))
                             .into();
 
-                        (card, cosmic::iced_core::widget::tree::State::None, offset)
+                        (card, cosmic::iced::core::widget::tree::State::None, offset)
                     });
 
                 col = col.push(reorder_list);
@@ -327,7 +327,7 @@ impl AlarmState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));

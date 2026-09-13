@@ -364,7 +364,7 @@ impl StopwatchState {
                     .class(cosmic::theme::Container::Custom(Box::new(
                         |theme| {
                             let mut style =
-                                cosmic::iced_widget::container::Catalog::style(
+                                cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );

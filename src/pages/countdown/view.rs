@@ -87,7 +87,7 @@ impl CountdownState {
         let icon = widget::icon::icon(crate::app::bundled_icon(crate::app::COUNTDOWN_ICON))
             .size(128)
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
@@ -180,7 +180,7 @@ impl CountdownState {
             .max_width(340.0)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                 let cosmic = theme.cosmic();
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -262,7 +262,7 @@ impl CountdownState {
                     .padding(spacing)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                         let cosmic = theme.cosmic();
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );

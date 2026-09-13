@@ -5,13 +5,13 @@
 
 use super::{CustomSoundTarget, Message};
 use cosmic::iced::keyboard::{self, key::Named, Key};
-use cosmic::iced_futures;
+use cosmic::iced::stream as iced_stream;
 use cosmic::prelude::*;
 use std::time::Duration;
 
 pub(super) fn tick_subscription() -> impl futures_util::Stream<Item = Message> {
     use futures_util::SinkExt;
-    iced_futures::stream::channel(1, async |mut emitter| {
+    iced_stream::channel(1, async |mut emitter| {
         let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
             interval.tick().await;

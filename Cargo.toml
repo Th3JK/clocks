@@ -32,7 +32,7 @@ tokio = { version = "1.48.0", features = ["full"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
-rev = "c52ef976500c270b1f9b5fe488dbe5e153022ad3"
+rev = "7e82198ab1aba712640b0167e58ad37bf03012ca"
 # See https://github.com/pop-os/libcosmic/blob/master/Cargo.toml for available features.
 features = [
     # Accessibility support

@@ -174,7 +174,7 @@ impl WorkoutState {
             .width(Length::Fill)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                 let cosmic = theme.cosmic();
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -284,7 +284,7 @@ impl WorkoutState {
         let time_text = widget::text(mmss(w.remaining)).size(56.0).font(light_font());
 
         let hero = widget::container(
-            cosmic::iced_widget::stack![
+            cosmic::iced::widget::stack![
                 circle,
                 widget::container(time_text)
                     .align_x(Alignment::Center)
@@ -381,7 +381,7 @@ impl WorkoutState {
         let time_text = widget::text(mmss(w.remaining)).size(28.0).font(light_font());
 
         let circle_with_time = widget::container(
-            cosmic::iced_widget::stack![
+            cosmic::iced::widget::stack![
                 circle,
                 widget::container(time_text)
                     .align_x(Alignment::Center)
@@ -425,7 +425,7 @@ impl WorkoutState {
             .width(Length::Fill)
             .max_width(340.0)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -588,7 +588,7 @@ impl WorkoutState {
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                             let accent = Color::from(theme.cosmic().accent_color());
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(accent)),
                                 border: cosmic::iced::Border {
                                     radius: 2.0.into(),
@@ -607,7 +607,7 @@ impl WorkoutState {
                         .size(16)
                         .icon()
                         .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                            |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                            |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().palette.neutral_7.into()),
                             },
                         )))
@@ -638,7 +638,7 @@ impl WorkoutState {
                     .padding(8)
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -680,7 +680,7 @@ impl WorkoutState {
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                         let accent = Color::from(theme.cosmic().accent_color());
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -693,7 +693,7 @@ impl WorkoutState {
                     })))
                     .into();
 
-                (card, cosmic::iced_core::widget::tree::State::None, offset)
+                (card, cosmic::iced::core::widget::tree::State::None, offset)
             });
 
         col = col.push(reorder_list);
@@ -732,7 +732,7 @@ impl WorkoutState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
