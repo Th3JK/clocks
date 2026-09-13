@@ -111,6 +111,7 @@ alarm-ringing = Budík: { $label }
 ringing = Zvoní...
 alarm-label-placeholder = Název budíku
 alarm-default-label = Budík
+alarm-snoozed-until = Odloženo do { $time }
 once = Jednou
 every-day = Každý den
 select-specific-days = Nebo vyberte konkrétní dny:

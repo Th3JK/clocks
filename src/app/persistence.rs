@@ -61,6 +61,11 @@ pub(super) fn build_config_from_state(
                 sound: a.sound.clone(),
                 snooze_minutes: a.snooze_minutes,
                 ring_minutes: a.ring_minutes,
+                snoozed_until: al
+                    .snoozed
+                    .iter()
+                    .find(|s| s.alarm_id == a.id)
+                    .map(|s| s.retrigger_at),
             }
         })
         .collect();
@@ -289,7 +294,32 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
         })
         .collect();
 
-    let next_id = alarms.len() as u32 + 1;
+    // Ids are positional, so derive the next id from the highest in use rather
+    // than the count. With deletions in play `len() + 1` can collide with a
+    // live id, which now matters because snoozes reference alarms by id.
+    let next_id = alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
+
+    // Rebuild pending snoozes from the saved re-ring times. Everything else the
+    // snooze needs is already on the alarm itself, so only the time is stored.
+    // A snooze whose time passed while the app was closed is dropped rather than
+    // fired retroactively.
+    let now = chrono::Local::now();
+    let snoozed = config
+        .alarms
+        .iter()
+        .zip(alarms.iter())
+        .filter_map(|(s, entry)| {
+            let retrigger_at = s.snoozed_until?;
+            (retrigger_at > now).then(|| alarm::SnoozedAlarm {
+                alarm_id: entry.id,
+                label: entry.label.clone(),
+                sound: entry.sound.clone(),
+                ring_minutes: entry.ring_minutes,
+                snooze_minutes: entry.snooze_minutes,
+                retrigger_at,
+            })
+        })
+        .collect();
 
     alarm::AlarmState {
         alarms,
@@ -297,10 +327,11 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
         editing: None,
         last_triggered_minute: None,
         ringing: Vec::new(),
-        snoozed: Vec::new(),
+        snoozed,
         edit_mode: false,
         dragging_index: None,
         pre_drag_order: Vec::new(),
+        last_saved_id: None,
     }
 }
 

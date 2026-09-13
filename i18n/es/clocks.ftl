@@ -111,6 +111,7 @@ alarm-ringing = Alarma: { $label }
 ringing = Sonando...
 alarm-label-placeholder = Etiqueta de alarma
 alarm-default-label = Alarma
+alarm-snoozed-until = Pospuesta hasta { $time }
 once = Una vez
 every-day = Todos los días
 select-specific-days = O seleccione días específicos:

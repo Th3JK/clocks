@@ -111,6 +111,7 @@ alarm-ringing = Будильник: { $label }
 ringing = Звонит...
 alarm-label-placeholder = Название будильника
 alarm-default-label = Будильник
+alarm-snoozed-until = Отложено до { $time }
 once = Однократно
 every-day = Каждый день
 select-specific-days = Или выберите определённые дни:

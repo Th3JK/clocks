@@ -39,11 +39,27 @@ impl AlarmState {
                 let time_str = Self::format_alarm_time(alarm, use_12h);
                 let id = alarm.id;
 
-                // Left side: label + time + repeat info
+                // Left side: label + time + repeat info. A pending snooze takes
+                // over the caption line: the stored hour/minute still show the
+                // original time, so without this a snoozed alarm is invisible.
+                let subtitle: Element<'_, Message> =
+                    if let Some(s) = self.snoozed.iter().find(|s| s.alarm_id == id) {
+                        widget::text::caption(fl!(
+                            "alarm-snoozed-until",
+                            time = Self::format_snooze_time(s.retrigger_at, use_12h)
+                        ))
+                        .class(cosmic::theme::Text::Color(
+                            cosmic::theme::active().cosmic().accent_color().into(),
+                        ))
+                        .into()
+                    } else {
+                        widget::text::caption(format!("{}", alarm.repeat_mode)).into()
+                    };
+
                 let left = widget::column::with_capacity(3)
                     .push(widget::text::body(&alarm.label))
                     .push(widget::text::title3(time_str))
-                    .push(widget::text::caption(format!("{}", alarm.repeat_mode)))
+                    .push(subtitle)
                     .width(Length::Fill);
 
                 // Toggle
@@ -341,6 +357,20 @@ impl AlarmState {
             format!("{:02}:{:02} {}", h12, alarm.minute, period)
         } else {
             format!("{:02}:{:02}", alarm.hour, alarm.minute)
+        }
+    }
+
+    /// Format a pending snooze re-ring time, matching `format_alarm_time`'s
+    /// 12h/24h convention.
+    fn format_snooze_time(at: chrono::DateTime<chrono::Local>, use_12h: bool) -> String {
+        use chrono::Timelike;
+        let hour = at.hour() as u8;
+        if use_12h {
+            let (h12, is_pm) = hour24_to_12(hour);
+            let period = if is_pm { fl!("pm") } else { fl!("am") };
+            format!("{:02}:{:02} {}", h12, at.minute(), period)
+        } else {
+            format!("{:02}:{:02}", hour, at.minute())
         }
     }
 

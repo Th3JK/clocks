@@ -111,6 +111,7 @@ alarm-ringing = Wecker: { $label }
 ringing = Klingelt...
 alarm-label-placeholder = Wecker-Bezeichnung
 alarm-default-label = Wecker
+alarm-snoozed-until = Schlummert bis { $time }
 once = Einmal
 every-day = Jeden Tag
 select-specific-days = Oder wählen Sie bestimmte Tage:

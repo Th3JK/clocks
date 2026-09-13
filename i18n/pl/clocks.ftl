@@ -111,6 +111,7 @@ alarm-ringing = Budzik: { $label }
 ringing = Dzwoni...
 alarm-label-placeholder = Etykieta budzika
 alarm-default-label = Budzik
+alarm-snoozed-until = Drzemka do { $time }
 once = Raz
 every-day = Każdego dnia
 select-specific-days = Lub wybierz konkretne dni:

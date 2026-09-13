@@ -417,8 +417,14 @@ impl cosmic::Application for AppModel {
                 alarm::Message::SaveAlarm => {
                     self.alarm.update(msg.clone(), self.use_12h);
                     self.core.window.show_context = false;
-                    // Show toast for newly created alarm (enabled by default)
-                    if let Some(alarm) = self.alarm.alarms.last() {
+                    // Toast the alarm that was actually saved. Using the last list
+                    // entry breaks when editing, and auto-sort may reorder the list
+                    // during the save, making the position arbitrary.
+                    if let Some(alarm) = self
+                        .alarm
+                        .last_saved_id
+                        .and_then(|id| self.alarm.alarms.iter().find(|a| a.id == id))
+                    {
                         if alarm.is_enabled {
                             let alarm = alarm.clone();
                             let task = self.push_alarm_toast(&alarm);

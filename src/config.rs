@@ -126,6 +126,14 @@ pub struct SavedAlarm {
     pub sound: String,
     pub snooze_minutes: u8,
     pub ring_minutes: u8,
+    /// Wall-clock time a pending snooze re-rings, `None` when not snoozed.
+    ///
+    /// `#[serde(default)]` keeps configs written before this field existed
+    /// loadable. Note the struct `#[version]` must *not* be bumped for this:
+    /// cosmic-config puts the version in the directory path, so a bump would
+    /// start from an empty config and discard the user's existing data.
+    #[serde(default)]
+    pub snoozed_until: Option<chrono::DateTime<chrono::Local>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
