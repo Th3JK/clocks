@@ -31,7 +31,7 @@ add = Přidat
 time-format = Formát času
 time-format-system = Systémový
 time-format-24h = 24hodinový
-time-format-12h = 12hodinový (AM/PM)
+time-format-12h = 12hodinový
 
 # Tooltips
 tooltip-add = Přidat

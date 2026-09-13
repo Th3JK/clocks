@@ -31,7 +31,7 @@ add = Добавить
 time-format = Формат времени
 time-format-system = Системный
 time-format-24h = 24-часовой
-time-format-12h = 12-часовой (AM/PM)
+time-format-12h = 12-часовой
 
 # Tooltips
 tooltip-add = Добавить
