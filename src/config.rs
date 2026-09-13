@@ -182,6 +182,15 @@ pub struct SavedClock {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedAlarm {
+    /// Stable identity, independent of position in the list.
+    ///
+    /// Ids used to be derived from list position on load, so reordering the
+    /// alarms renumbered them -- and a pending snooze, which references its
+    /// alarm by id, would silently reattach to a different one. Auto-sort made
+    /// that happen during an ordinary save. `0` means a config written before
+    /// this field existed; `restore_alarms` assigns those positionally once.
+    #[serde(default)]
+    pub id: u32,
     pub hour: u8,
     pub minute: u8,
     pub label: String,

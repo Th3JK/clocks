@@ -57,6 +57,7 @@ pub(super) fn build_config_from_state(
                 ),
             };
             SavedAlarm {
+                id: a.id,
                 hour: a.hour,
                 minute: a.minute,
                 label: a.label.clone(),
@@ -382,6 +383,25 @@ pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocks
 }
 
 pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
+    // Resolve ids before building the entries. A config written before ids
+    // existed has every id at 0 and gets numbered from 1, which reproduces the
+    // old positional behaviour exactly for a one-time migration. After that the
+    // stored id wins, so reordering never renumbers anything.
+    let mut next_free = config.alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
+    let ids: Vec<u32> = config
+        .alarms
+        .iter()
+        .map(|a| {
+            if a.id == 0 {
+                let id = next_free;
+                next_free += 1;
+                id
+            } else {
+                a.id
+            }
+        })
+        .collect();
+
     let alarms: Vec<alarm::AlarmEntry> = config
         .alarms
         .iter()
@@ -418,7 +438,7 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
                 a.sound.clone()
             };
             alarm::AlarmEntry {
-                id: (i + 1) as u32,
+                id: ids[i],
                 hour: a.hour,
                 minute: a.minute,
                 label: a.label.clone(),
@@ -431,9 +451,8 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
         })
         .collect();
 
-    // Ids are positional, so derive the next id from the highest in use rather
-    // than the count. With deletions in play `len() + 1` can collide with a
-    // live id, which now matters because snoozes reference alarms by id.
+    // From the highest id in use, never the count: with deletions in play
+    // `len() + 1` can collide with a live id.
     let next_id = alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
 
     // Rebuild pending snoozes from the saved re-ring times. Everything else the
