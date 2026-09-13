@@ -126,6 +126,9 @@ impl cosmic::Application for AppModel {
             show_shortcuts_dialog: false,
             nav_order,
             nav_hidden,
+            show_settings: false,
+            nav_dragging: None,
+            nav_pre_drag: Vec::new(),
             runtime: crate::runtime::RuntimeState::default(),
             show_palette: false,
             palette_input: String::new(),
@@ -200,6 +203,14 @@ impl cosmic::Application for AppModel {
                 ],
             ),
         )]);
+
+        // `MenuBar` defaults to `ItemWidth::Uniform(150)`, which ignores each
+        // tree's own width outright -- that 150 is the cramped dropdown. Setting
+        // it here is what actually widens the menu; `MenuTree::width` is only
+        // consulted under `ItemWidth::Static`.
+        let menu_bar = menu_bar
+            .item_width(menu::ItemWidth::Uniform(260))
+            .item_height(menu::ItemHeight::Uniform(36));
 
         vec![menu_bar.into()]
     }
@@ -294,15 +305,18 @@ impl cosmic::Application for AppModel {
                 )
                 .title(title)
             }
-            ContextPage::Settings => context_drawer::context_drawer(
-                self.settings_view(),
-                Message::ToggleContextPage(ContextPage::Settings),
-            )
-            .title(fl!("settings")),
         })
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
+        if self.show_settings {
+            let page = widget::container(self.settings_page())
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(16);
+            return toaster::toaster(&self.toasts, page).into();
+        }
+
         let content: Element<_> = match self.nav.active_data::<Page>() {
             Some(Page::WorldClocks) => self
                 .world_clocks
@@ -388,6 +402,11 @@ impl cosmic::Application for AppModel {
             Message::Tick
                 | Message::UpdateConfig(_)
                 | Message::UpdateRuntime(_)
+                // Fires per drag-motion event; the order is saved on finish.
+                | Message::NavStartDrag(_)
+                | Message::NavReorder(..)
+                | Message::NavCancelDrag
+                | Message::ShowSettings
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
                 | Message::OpenPalette
@@ -900,6 +919,41 @@ impl cosmic::Application for AppModel {
                 self.rebuild_nav();
                 return self.update_title();
             }
+            Message::ShowSettings => {
+                self.show_settings = true;
+                // Nothing else should be competing for the window.
+                self.core.window.show_context = false;
+                self.show_palette = false;
+            }
+
+            Message::NavStartDrag(index) => {
+                self.nav_pre_drag = self.nav_order.clone();
+                self.nav_dragging = Some(index);
+            }
+            Message::NavReorder(from, to) => {
+                if from < self.nav_order.len() && to <= self.nav_order.len() && from != to {
+                    let page = self.nav_order.remove(from);
+                    let insert_at = if to > from { to - 1 } else { to };
+                    let insert_at = insert_at.min(self.nav_order.len());
+                    self.nav_order.insert(insert_at, page);
+                    self.nav_dragging = Some(insert_at);
+                    self.rebuild_nav();
+                }
+            }
+            Message::NavFinishDrag => {
+                self.nav_dragging = None;
+                self.nav_pre_drag.clear();
+            }
+            Message::NavCancelDrag => {
+                // Restore by id order: the list has already been mutated in
+                // place by the Reorder messages seen during the drag.
+                if !self.nav_pre_drag.is_empty() {
+                    self.nav_order = std::mem::take(&mut self.nav_pre_drag);
+                    self.rebuild_nav();
+                }
+                self.nav_dragging = None;
+            }
+
             Message::UpdateRuntime(ref runtime) => {
                 // Mirror the daemon's state into the fields the alarm views
                 // already read, so nothing downstream has to know the schedule
@@ -1025,16 +1079,6 @@ impl cosmic::Application for AppModel {
                 self.runtime = runtime.clone();
             }
 
-            Message::MoveNavPage(from, to) => {
-                // Both indices are produced by the settings rows and so are
-                // always in range; bounds-check anyway rather than risk a panic
-                // on a view built from stale state.
-                if from != to && from < self.nav_order.len() && to < self.nav_order.len() {
-                    self.nav_order.swap(from, to);
-                    self.rebuild_nav();
-                }
-            }
-
             Message::OpenPalette => {
                 self.show_palette = true;
                 self.palette_input.clear();
@@ -1071,6 +1115,8 @@ impl cosmic::Application for AppModel {
                 // mode of whichever page is showing one.
                 if self.show_shortcuts_dialog {
                     self.show_shortcuts_dialog = false;
+                } else if self.show_settings {
+                    self.show_settings = false;
                 } else {
                     match self.nav.active_data::<Page>() {
                         Some(Page::Timer) => self.timer.focused_id = None,
@@ -1224,6 +1270,10 @@ impl cosmic::Application for AppModel {
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Self::Message>> {
         self.nav.activate(id);
         self.core.window.show_context = false;
+        // Settings renders ahead of the nav page, so without this a sidebar
+        // click would move the highlight and change nothing on screen. The
+        // sidebar is how you leave settings.
+        self.show_settings = false;
         self.update_title()
     }
 }

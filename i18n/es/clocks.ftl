@@ -215,7 +215,7 @@ shortcuts-chess-switch = Cambiar reloj (Ajedrez)
 
 # Settings — world clocks section
 settings-section-sidebar = Barra lateral
-settings-sidebar-description = Usa las flechas para reordenar, desactiva para ocultar
+settings-sidebar-description = Arrastra para reordenar, desactiva para ocultar
 settings-section-world-clocks = Relojes mundiales
 settings-auto-sort-world-clocks = Ordenar automáticamente por diferencia horaria
 

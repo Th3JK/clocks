@@ -215,7 +215,7 @@ shortcuts-chess-switch = Przełącz zegar (Szachy)
 
 # Settings — world clocks section
 settings-section-sidebar = Panel boczny
-settings-sidebar-description = Strzałkami zmienisz kolejność; wyłącz, aby ukryć
+settings-sidebar-description = Przeciągnij, aby zmienić kolejność; wyłącz, aby ukryć
 settings-section-world-clocks = Zegary światowe
 settings-auto-sort-world-clocks = Automatycznie sortuj według przesunięcia strefy czasowej
 

@@ -215,7 +215,7 @@ shortcuts-chess-switch = Uhr wechseln (Schach)
 
 # Settings — world clocks section
 settings-section-sidebar = Seitenleiste
-settings-sidebar-description = Mit den Pfeilen umsortieren, zum Ausblenden ausschalten
+settings-sidebar-description = Zum Umsortieren ziehen, zum Ausblenden ausschalten
 settings-section-world-clocks = Weltuhren
 settings-auto-sort-world-clocks = Automatisch nach Zeitzonenversatz sortieren
 

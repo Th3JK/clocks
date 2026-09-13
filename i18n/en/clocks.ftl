@@ -215,7 +215,7 @@ shortcuts-chess-switch = Switch clock (Chess)
 
 # Settings — world clocks section
 settings-section-sidebar = Sidebar
-settings-sidebar-description = Use the arrows to reorder pages, or switch one off to hide it
+settings-sidebar-description = Drag to reorder pages, or switch one off to hide it
 settings-section-world-clocks = World Clocks
 settings-auto-sort-world-clocks = Automatically sort by timezone offset
 

@@ -3,13 +3,40 @@
 // Dialog and settings view helpers for `AppModel`.
 
 use super::{AppModel, ConfirmationCategory, DestructiveAction, Message};
+use crate::components::reorder_list::ReorderList;
 use crate::fl;
 use cosmic::iced::{Alignment, Color, Length};
 use cosmic::prelude::*;
 use cosmic::widget;
 
 impl AppModel {
-    pub(super) fn settings_view(&self) -> Element<'_, Message> {
+    /// Settings as a full page.
+    ///
+    /// The context drawer used to supply the title and the scrolling; outside
+    /// one, this has to. Standing rule 7 -- forms must not push their own
+    /// heading -- applies to drawer content specifically, for exactly that
+    /// reason.
+    pub(super) fn settings_page(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        // Left-aligned, like every other page's header. A centred title with a
+        // back arrow belongs to the focus views, which are a drill-down *within*
+        // a page; settings is a peer of the other pages. Selecting anything in
+        // the sidebar leaves it, so there is nothing for an arrow to do.
+        let header = widget::row::with_capacity(1)
+            .align_y(Alignment::Center)
+            .push(widget::text::title3(fl!("settings")).width(Length::Fill));
+
+        widget::column::with_capacity(2)
+            .spacing(spacing.space_s)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .push(header)
+            .push(widget::scrollable(self.settings_view()).height(Length::Fill))
+            .into()
+    }
+
+    fn settings_view(&self) -> Element<'_, Message> {
         let spacing = 12;
         let mut col = widget::column::with_capacity(12).spacing(spacing);
 
@@ -113,14 +140,16 @@ impl AppModel {
         col.into()
     }
 
-    /// Sidebar customisation: arrows to reorder, toggle to show or hide.
+    /// Sidebar customisation: drag to reorder, toggle to show or hide.
     ///
-    /// Deliberately buttons rather than drag-and-drop. The settings drawer is an
-    /// iced overlay, and `dnd_rectangles` walks only the base layout, so a drop
-    /// target inside a context drawer is never registered with the compositor:
-    /// the drag starts, the icon appears, and nothing else ever happens. The
-    /// `ReorderList` used on the alarm/timer/pomodoro/workout/world-clock pages
-    /// works because those live in `view()`.
+    /// Drag works here only because settings is a page in `view()`. Inside a
+    /// context drawer it would be silently inert: the drawer is an iced overlay
+    /// and `dnd_rectangles` walks the base layout only, so the drop target is
+    /// never registered with the compositor.
+    ///
+    /// Rows live in their own column at `space_xxs` spacing and are uniform
+    /// height, because `ReorderList` hit-tests by dividing its bounds evenly --
+    /// the settings column's spacing of 12 would skew every drop target.
     fn nav_settings_view(&self) -> Element<'_, Message> {
         let cosmic::cosmic_theme::Spacing {
             space_xxs, space_xs, ..
@@ -131,7 +160,7 @@ impl AppModel {
             .iter()
             .filter(|p| !self.nav_hidden.contains(p))
             .count();
-        let last = self.nav_order.len().saturating_sub(1);
+        let dragging = self.nav_dragging;
 
         let rows: Vec<Element<'_, Message>> = self
             .nav_order
@@ -144,26 +173,35 @@ impl AppModel {
                 // "select a view" with nothing to click.
                 let can_hide = !shown || visible_count > 1;
 
-                // Disabled rather than hidden at the ends, so every row keeps
-                // the same width and the toggles stay in one column.
-                let move_button = |name, target: Option<usize>| {
-                    widget::button::icon(widget::icon::from_name(name))
-                        .on_press_maybe(target.map(|to| Message::MoveNavPage(index, to)))
-                };
+                // The dragged row collapses to an accent drop-indicator line.
+                if dragging == Some(index) {
+                    return widget::container(widget::Space::new().width(Length::Fill))
+                        .height(Length::Fixed(4.0))
+                        .width(Length::Fill)
+                        .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                            let accent = Color::from(theme.cosmic().accent_color());
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Background::Color(accent)),
+                                border: cosmic::iced::Border {
+                                    radius: 2.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        })))
+                        .into();
+                }
 
-                let row = widget::row::with_capacity(5)
+                let row = widget::row::with_capacity(4)
                     .align_y(Alignment::Center)
                     .spacing(space_xs)
+                    .push(
+                        widget::icon::from_name("grip-lines-symbolic")
+                            .size(16)
+                            .icon(),
+                    )
                     .push(super::helpers::page_icon(page).size(16))
                     .push(widget::text::body(super::helpers::page_title(page)).width(Length::Fill))
-                    .push(move_button(
-                        "go-up-symbolic",
-                        (index > 0).then(|| index - 1),
-                    ))
-                    .push(move_button(
-                        "go-down-symbolic",
-                        (index < last).then(|| index + 1),
-                    ))
                     .push(
                         widget::toggler(shown)
                             .on_toggle_maybe(can_hide.then_some(move |v| {
@@ -189,8 +227,53 @@ impl AppModel {
             })
             .collect();
 
-        widget::column::with_children(rows)
-            .spacing(space_xxs)
+        let count = rows.len();
+        let cards = widget::column::with_children(rows).spacing(space_xxs);
+
+        // The drag-icon closure must be 'static, so snapshot the labels.
+        let labels: Vec<String> = self
+            .nav_order
+            .iter()
+            .map(|p| super::helpers::page_title(*p))
+            .collect();
+
+        ReorderList::new(cards, count, dragging)
+            .on_start_drag(Message::NavStartDrag)
+            .on_reorder(|from, to| Message::NavReorder(from, to))
+            .on_finish(Message::NavFinishDrag)
+            .on_cancel(Message::NavCancelDrag)
+            .drag_icon(move |index, offset| {
+                let label = labels.get(index).cloned().unwrap_or_default();
+                let content = widget::row::with_children(vec![
+                    widget::icon::from_name("grip-lines-symbolic")
+                        .size(16)
+                        .icon()
+                        .into(),
+                    widget::text::body(label).width(Length::Fill).into(),
+                ])
+                .spacing(space_xs)
+                .align_y(Alignment::Center);
+
+                let card: Element<'static, ()> = widget::container(content)
+                    .padding(8)
+                    .width(Length::Fill)
+                    .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                        let accent = Color::from(theme.cosmic().accent_color());
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
+                            theme,
+                            &cosmic::theme::Container::Primary,
+                        );
+                        style.border.radius = theme.cosmic().radius_s().into();
+                        style.border.color = accent;
+                        style.border.width = 2.0;
+                        style.background =
+                            Some(Color::from(theme.cosmic().bg_component_color()).into());
+                        style
+                    })))
+                    .into();
+
+                (card, cosmic::iced::core::widget::tree::State::None, offset)
+            })
             .into()
     }
 

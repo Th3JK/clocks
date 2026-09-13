@@ -79,6 +79,16 @@ pub struct AppModel {
     /// the tick renders from, so the countdown stays smooth without a D-Bus
     /// round-trip per frame.
     runtime: crate::runtime::RuntimeState,
+    /// Whether the settings page is showing. Session-only.
+    ///
+    /// A page rather than a nav entry: the sidebar list is user-reorderable and
+    /// hideable, so putting Settings in it would let someone hide the only route
+    /// to it.
+    show_settings: bool,
+    /// Drag state for reordering the sidebar. Works because settings is a page
+    /// in `view()` -- drag inside a context drawer is silently inert.
+    nav_dragging: Option<usize>,
+    nav_pre_drag: Vec<crate::pages::Page>,
     /// Quick-action palette state (session-only).
     show_palette: bool,
     palette_input: String,
@@ -153,8 +163,11 @@ pub enum Message {
     PaletteRun(crate::quick_action::QuickAction),
     // Sidebar customisation
     ToggleNavPage(crate::pages::Page, bool),
-    /// Move the sidebar page at the first index to the second.
-    MoveNavPage(usize, usize),
+    ShowSettings,
+    NavStartDrag(usize),
+    NavReorder(usize, usize),
+    NavFinishDrag,
+    NavCancelDrag,
     /// The daemon's runtime state changed: something started or stopped ringing.
     UpdateRuntime(crate::runtime::RuntimeState),
     // Confirmation dialogs
@@ -195,7 +208,7 @@ impl menu::action::MenuAction for MenuAction {
     fn message(&self) -> Self::Message {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
-            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
+            MenuAction::Settings => Message::ShowSettings,
             MenuAction::Shortcuts => Message::ShowShortcutsDialog,
             MenuAction::QuickAction => Message::OpenPalette,
         }
