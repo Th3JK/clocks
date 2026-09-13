@@ -346,4 +346,10 @@ countdown-reminder-body = { $label } — { $when }
 countdown-arrived = { $label } nadeszło
 countdown-dhms = { $days } d { $hours } h { $minutes } m { $seconds } s
 countdown-ago = { $when } (minęło)
+countdown-passed = Minęło
+countdown-edit = Edytuj wydarzenie
+countdown-days = { $days ->
+    [one] { $days } dzień
+   *[other] { $days } dni
+}
 notification-countdown = Odliczanie

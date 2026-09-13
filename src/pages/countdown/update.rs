@@ -69,6 +69,11 @@ impl CountdownState {
                 if self.editing_id == Some(id) {
                     self.editing_id = None;
                 }
+                // Leave focus mode rather than showing a full page for an
+                // event that no longer exists.
+                if self.focused_id == Some(id) {
+                    self.focused_id = None;
+                }
             }
             Message::OpenSettings => {
                 // Opening the drawer always means "new". Without this, opening
@@ -167,6 +172,8 @@ impl CountdownState {
                 // Handled in app.rs
             }
             Message::ToggleEditMode => self.edit_mode = !self.edit_mode,
+            Message::Focus(id) => self.focused_id = Some(id),
+            Message::Unfocus => self.focused_id = None,
         }
 
         notifications

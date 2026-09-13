@@ -341,9 +341,18 @@ countdown-reminder-15min = 15 Minuten vorher
 countdown-reminder-1hour = 1 Stunde vorher
 countdown-reminder-1day = 1 Tag vorher
 countdown-reminder-1week = 1 Woche vorher
-countdown-reminder-count = { $count } Erinnerungen
+countdown-reminder-count = { $count ->
+    [one] { $count } Erinnerung
+   *[other] { $count } Erinnerungen
+}
 countdown-reminder-body = { $label } — { $when }
 countdown-arrived = { $label } ist da
 countdown-dhms = { $days } T { $hours } Std { $minutes } Min { $seconds } S
 countdown-ago = { $when } (vorbei)
+countdown-passed = Vorbei
+countdown-edit = Ereignis bearbeiten
+countdown-days = { $days ->
+    [one] { $days } Tag
+   *[other] { $days } Tage
+}
 notification-countdown = Countdown

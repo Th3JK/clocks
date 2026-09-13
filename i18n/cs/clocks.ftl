@@ -346,4 +346,11 @@ countdown-reminder-body = { $label } — { $when }
 countdown-arrived = { $label } nastává
 countdown-dhms = { $days } d { $hours } h { $minutes } m { $seconds } s
 countdown-ago = { $when } (proběhlo)
+countdown-passed = Proběhlo
+countdown-edit = Upravit událost
+countdown-days = { $days ->
+    [one] { $days } den
+    [few] { $days } dny
+   *[other] { $days } dní
+}
 notification-countdown = Odpočet

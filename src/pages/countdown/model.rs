@@ -164,8 +164,10 @@ pub struct CountdownState {
     pub edit_yearly: bool,
     pub edit_sound: String,
     pub edit_reminders: Vec<Reminder>,
-    // Edit mode (delete)
+    // Edit mode (edit / delete)
     pub edit_mode: bool,
+    /// Event shown full-page in focus mode. Session-only, not persisted.
+    pub focused_id: Option<u32>,
     /// Wall-clock second the tick last did real work, so the 100 ms global tick
     /// doesn't redo date arithmetic ten times a second.
     pub last_check: Option<DateTime<Local>>,
@@ -204,6 +206,7 @@ impl Default for CountdownState {
             edit_sound: "Bell".to_string(),
             edit_reminders: vec![Reminder::OneHour],
             edit_mode: false,
+            focused_id: None,
             last_check: None,
         }
     }

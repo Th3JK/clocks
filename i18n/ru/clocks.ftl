@@ -346,4 +346,11 @@ countdown-reminder-body = { $label } — { $when }
 countdown-arrived = { $label } наступило
 countdown-dhms = { $days } д { $hours } ч { $minutes } м { $seconds } с
 countdown-ago = { $when } (прошло)
+countdown-passed = Прошло
+countdown-edit = Изменить событие
+countdown-days = { $days ->
+    [one] { $days } день
+    [few] { $days } дня
+   *[other] { $days } дней
+}
 notification-countdown = Обратный отсчёт

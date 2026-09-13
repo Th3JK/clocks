@@ -28,6 +28,102 @@ fn dhms(total: i64) -> (i64, i64, i64, i64) {
 
 impl CountdownState {
     pub fn view(&self, use_12h: bool) -> Element<'_, Message> {
+        if let Some(id) = self.focused_id
+            && let Some(event) = self.events.iter().find(|e| e.id == id)
+        {
+            return self.focus_view(event, use_12h);
+        }
+        self.card_grid_view(use_12h)
+    }
+
+    /// Full-page view of a single event: back header, the countdown as the
+    /// hero, then the details underneath.
+    fn focus_view<'a>(&'a self, event: &'a CountdownEvent, use_12h: bool) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+        let now = Local::now();
+        let secs = event.seconds_until(now);
+        let passed = secs <= 0;
+        let (d, h, m, s) = dhms(secs);
+
+        let back = widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+            .on_press(Message::Unfocus);
+
+        let header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(back)
+            .push(
+                widget::container(widget::text::title3(&event.label))
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill),
+            )
+            // Balances the back button so the title stays optically centred.
+            .push(widget::Space::new().width(40.0));
+
+        // Days are worth their own line here -- there is room for it, unlike on
+        // the card where everything has to stay on one row.
+        let clock = widget::text(format!("{h:02}:{m:02}:{s:02}"))
+            .size(72.0)
+            .font(light_font());
+
+        let mut hero = widget::column::with_capacity(4)
+            .spacing(spacing.space_xxs)
+            .align_x(Alignment::Center)
+            .width(Length::Fill);
+
+        if d > 0 {
+            hero = hero.push(
+                widget::text(fl!("countdown-days", days = d))
+                    .size(28.0)
+                    .font(light_font()),
+            );
+        }
+        hero = hero.push(clock);
+        hero = hero.push(widget::text::body(format_target(event.target, use_12h)));
+        if passed {
+            hero = hero.push(widget::text::caption(fl!("countdown-passed")));
+        }
+
+        let mut col = widget::column::with_capacity(4)
+            .spacing(spacing.space_m)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .push(header)
+            .push(
+                widget::container(hero)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+            );
+
+        let mut facts = widget::column::with_capacity(3)
+            .spacing(spacing.space_xxs)
+            .align_x(Alignment::Center)
+            .width(Length::Fill);
+        if event.yearly {
+            facts = facts.push(widget::text::caption(fl!("countdown-yearly")));
+        }
+        if !event.reminders.is_empty() {
+            facts = facts.push(widget::text::caption(fl!(
+                "countdown-reminder-count",
+                count = event.reminders.len()
+            )));
+        }
+        col = col.push(facts);
+
+        col = col.push(
+            widget::container(
+                widget::button::standard(fl!("countdown-edit"))
+                    .on_press(Message::StartEditEvent(event.id)),
+            )
+            .align_x(Alignment::Center)
+            .width(Length::Fill),
+        );
+
+        col.into()
+    }
+
+    fn card_grid_view(&self, use_12h: bool) -> Element<'_, Message> {
         let spacing = cosmic::theme::spacing();
 
         let mut col = widget::column::with_capacity(3)
@@ -149,29 +245,49 @@ impl CountdownState {
             when
         };
 
+        // `width(Fill)` is load-bearing: without it the column shrink-wraps its
+        // content and `align_x(Center)` only centres the rows against each
+        // other, leaving the whole block hugging the left edge of the card with
+        // each line indented differently.
         let mut card_col = widget::column::with_capacity(5)
             .spacing(spacing.space_xxs)
             .align_x(Alignment::Center)
+            .width(Length::Fill)
             .padding(spacing.space_s)
             .push(widget::text::title4(&event.label))
             .push(big)
             .push(widget::text::caption(sub));
 
-        let mut badges = widget::row::with_capacity(2).spacing(spacing.space_xxs);
+        let mut badges = widget::row::with_capacity(2).spacing(spacing.space_xs);
         if event.yearly {
             badges = badges.push(widget::text::caption(fl!("countdown-yearly")));
         }
         if !event.reminders.is_empty() {
             badges = badges.push(widget::text::caption(fl!(
                 "countdown-reminder-count",
-                count = event.reminders.len().to_string()
+                count = event.reminders.len()
             )));
         }
-        card_col = card_col.push(badges);
+        card_col = card_col.push(
+            widget::container(badges)
+                .align_x(Alignment::Center)
+                .width(Length::Fill),
+        );
 
+        // In edit mode the card stops being a press target, so editing and
+        // deleting get explicit buttons instead.
         if self.edit_mode {
             card_col = card_col.push(
-                widget::button::destructive(fl!("delete")).on_press(Message::Delete(id)),
+                widget::row::with_capacity(2)
+                    .spacing(spacing.space_xs)
+                    .push(
+                        widget::button::standard(fl!("countdown-edit"))
+                            .on_press(Message::StartEditEvent(id)),
+                    )
+                    .push(
+                        widget::button::destructive(fl!("delete"))
+                            .on_press(Message::Delete(id)),
+                    ),
             );
         }
 
@@ -189,14 +305,12 @@ impl CountdownState {
                 style
             })));
 
-        // Pressing a card opens its editor, matching Alarm. Suppressed in edit
-        // mode so the press target doesn't fight the delete button.
+        // Pressing a card opens it full-page, matching world clocks and timers.
+        // Suppressed in edit mode so the press target doesn't fight the buttons.
         if self.edit_mode {
             card.into()
         } else {
-            widget::mouse_area(card)
-                .on_press(Message::StartEditEvent(id))
-                .into()
+            widget::mouse_area(card).on_press(Message::Focus(id)).into()
         }
     }
 

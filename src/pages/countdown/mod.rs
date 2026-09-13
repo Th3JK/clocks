@@ -29,6 +29,9 @@ pub enum Message {
     ToggleReminder(Reminder),
     EditSound(String),
     BrowseCustomSound,
-    // Edit mode (delete)
+    // Edit mode (edit / delete)
     ToggleEditMode,
+    /// Show one event full-page, as the world clocks and timers do.
+    Focus(u32),
+    Unfocus,
 }
