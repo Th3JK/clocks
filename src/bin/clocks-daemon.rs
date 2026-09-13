@@ -450,21 +450,13 @@ impl DaemonInterface {
         });
     }
 
-    /// Nudge to re-read definitions. The scheduler reads them every tick, so
-    /// this exists mainly as an activation target for the GUI.
+    /// Deliberately empty, and deliberately kept.
+    ///
+    /// This exists purely as a D-Bus activation target: calling *any* method on
+    /// the interface is what starts the daemon, and the GUI calls this one at
+    /// launch for exactly that reason. The scheduler re-reads definitions every
+    /// tick, so there is nothing for it to do beyond existing.
     fn reload(&self) {}
-
-    /// Alarm ids currently ringing.
-    fn list_ringing(&self) -> Vec<u32> {
-        self.0
-            .state
-            .lock()
-            .expect("runtime state poisoned")
-            .ringing
-            .iter()
-            .map(|r| r.alarm_id)
-            .collect()
-    }
 }
 
 /// One pass of the schedule.
