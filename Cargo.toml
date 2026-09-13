@@ -17,6 +17,12 @@ path = "src/lib.rs"
 name = "clocks"
 path = "src/main.rs"
 
+# Owns everything time-based. Started on demand through D-Bus activation, and at
+# login through an autostart entry, so alarms fire with the GUI closed.
+[[bin]]
+name = "clocks-daemon"
+path = "src/bin/clocks-daemon.rs"
+
 [dependencies]
 # Reached directly rather than through `cosmic::cosmic_config`, so the config
 # schema does not depend on libcosmic's widget layer. Must stay on the same rev
@@ -44,6 +50,9 @@ jiff = "0.2"
 # lockfile transitively.
 libc = "0.2"
 tokio = { version = "1.48.0", features = ["full"] }
+# Already in the tree via notify-rust. The daemon uses the blocking API, so it
+# needs no async runtime of its own.
+zbus = "5"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

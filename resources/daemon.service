@@ -1,0 +1,7 @@
+[D-BUS Service]
+Name=dev.th3jk.clocks.Daemon
+Exec=/usr/bin/clocks-daemon
+# Picked up automatically where systemd runs the user session, ignored
+# everywhere else. The daemon does not depend on it -- plain D-Bus activation
+# works on any distro with a session bus.
+SystemdService=clocks-daemon.service

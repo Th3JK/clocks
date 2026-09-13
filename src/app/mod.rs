@@ -3,7 +3,7 @@
 mod dialogs;
 mod helpers;
 mod lifecycle;
-mod persistence;
+pub mod persistence;
 mod subscriptions;
 
 use crate::config::Config;
@@ -11,8 +11,6 @@ use crate::pages::ContextPage;
 use crate::pages::{alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks};
 use cosmic::widget::{about::About, menu, nav_bar, toaster};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../../resources/icons/hicolor/scalable/apps/icon.svg");
@@ -109,9 +107,6 @@ pub struct AppModel {
     active_timer_id: Option<u32>,
     active_pomodoro_id: Option<u32>,
 
-    // Audio stop handles for ringing alarms
-    alarm_audio_stops: HashMap<u32, Arc<AtomicBool>>,
-
     // Toast notifications
     toasts: toaster::Toasts<Message>,
 }
@@ -156,6 +151,8 @@ pub enum Message {
     ToggleNavPage(crate::pages::Page, bool),
     /// Move the sidebar page at the first index to the second.
     MoveNavPage(usize, usize),
+    /// The daemon's runtime state changed: something started or stopped ringing.
+    UpdateRuntime(crate::runtime::RuntimeState),
     // Confirmation dialogs
     ConfirmDestructiveAction,
     CancelDestructiveAction,

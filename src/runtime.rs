@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: MIT
+
+//! Runtime alarm state, owned by the daemon.
+//!
+//! Kept in a *separate* cosmic-config entry from [`crate::config::Config`],
+//! stored through `Config::new_state`, because two processes writing one entry
+//! cannot work here: `build_config_from_state` reconstructs the whole `Config`
+//! from the GUI's in-memory state without reading what is on disk, and the GUI
+//! saves on nearly every message. Anything the daemon wrote into that entry
+//! would be gone by the next keystroke.
+//!
+//! So the ownership rule is one writer per entry:
+//!
+//! - `Config`       -- user definitions and settings. GUI writes, daemon reads.
+//! - `RuntimeState` -- what is ringing, snoozed or spent. Daemon writes, GUI reads.
+//!
+//! The GUI observes this through `watch_state`, the same mechanism it already
+//! uses for its own config.
+
+use cosmic_config::{CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
+use serde::{Deserialize, Serialize};
+
+/// An alarm currently ringing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RingingRecord {
+    pub alarm_id: u32,
+    pub label: String,
+    pub sound: String,
+    pub ring_secs: u64,
+    pub snooze_minutes: u8,
+    /// Wall clock, not `Instant`: this crosses a process boundary and has to
+    /// survive the daemon being restarted mid-ring.
+    pub started_at: chrono::DateTime<chrono::Local>,
+}
+
+/// An alarm waiting to re-ring after a snooze.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SnoozeRecord {
+    pub alarm_id: u32,
+    pub label: String,
+    pub sound: String,
+    pub ring_minutes: u8,
+    pub snooze_minutes: u8,
+    pub retrigger_at: chrono::DateTime<chrono::Local>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, CosmicConfigEntry)]
+#[version = 1]
+pub struct RuntimeState {
+    #[serde(default)]
+    pub ringing: Vec<RingingRecord>,
+
+    #[serde(default)]
+    pub snoozed: Vec<SnoozeRecord>,
+
+    /// Ids of `RepeatMode::Once` alarms that have already fired.
+    ///
+    /// Firing a one-shot alarm used to clear `is_enabled` on the alarm itself,
+    /// which is a *definition* field the GUI owns -- the daemon must not write
+    /// there. The effective enabled state is therefore
+    /// `alarm.is_enabled && !consumed_once.contains(&alarm.id)`, and re-enabling
+    /// an alarm in the GUI clears its entry here.
+    #[serde(default)]
+    pub consumed_once: Vec<u32>,
+
+    /// How far the scheduler has already checked.
+    ///
+    /// Replaces the old `last_triggered_minute`, which was a single global
+    /// `(hour, minute)` tuple and so only suppressed a repeat *within* the same
+    /// minute -- if the process was asleep across the minute an alarm was due,
+    /// it was missed outright with no catch-up. A timestamp lets the scheduler
+    /// fire anything that came due while it was not looking.
+    #[serde(default)]
+    pub checked_through: Option<chrono::DateTime<chrono::Local>>,
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self {
+            ringing: Vec::new(),
+            snoozed: Vec::new(),
+            consumed_once: Vec::new(),
+            checked_through: None,
+        }
+    }
+}
+
+impl RuntimeState {
+    /// Open the state entry. Separate directory from the config entry, so the
+    /// version here is independent of `Config`'s.
+    pub fn context() -> Option<cosmic_config::Config> {
+        cosmic_config::Config::new_state(crate::APP_ID, Self::VERSION).ok()
+    }
+
+    pub fn load(ctx: &cosmic_config::Config) -> Self {
+        match Self::get_entry(ctx) {
+            Ok(state) => state,
+            Err((_errors, state)) => state,
+        }
+    }
+
+    pub fn is_ringing(&self, alarm_id: u32) -> bool {
+        self.ringing.iter().any(|r| r.alarm_id == alarm_id)
+    }
+
+    pub fn snooze_for(&self, alarm_id: u32) -> Option<&SnoozeRecord> {
+        self.snoozed.iter().find(|s| s.alarm_id == alarm_id)
+    }
+}

@@ -14,7 +14,7 @@ use std::time::Duration;
 // --- Persistence: build Config from runtime state ---
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn build_config_from_state(
+pub fn build_config_from_state(
     wc: &world_clocks::WorldClocksState,
     al: &alarm::AlarmState,
     ti: &timer::TimerState,
@@ -205,7 +205,7 @@ pub(super) fn build_config_from_state(
 /// to the built-in order. Any page missing from a stored order is appended:
 /// that is how a page added in a later release shows up instead of silently
 /// vanishing for anyone with a saved layout.
-pub(super) fn restore_nav(config: &Config) -> (Vec<crate::pages::Page>, Vec<crate::pages::Page>) {
+pub fn restore_nav(config: &Config) -> (Vec<crate::pages::Page>, Vec<crate::pages::Page>) {
     use crate::pages::Page;
     let mut order: Vec<Page> = config
         .nav_order
@@ -225,11 +225,11 @@ pub(super) fn restore_nav(config: &Config) -> (Vec<crate::pages::Page>, Vec<crat
     (order, hidden)
 }
 
-pub(super) fn restore_chess(config: &Config) -> chess::ChessState {
+pub fn restore_chess(config: &Config) -> chess::ChessState {
     chess::ChessState::new(config.chess.base_minutes, config.chess.increment_secs)
 }
 
-pub(super) fn restore_countdowns(config: &Config) -> countdown::CountdownState {
+pub fn restore_countdowns(config: &Config) -> countdown::CountdownState {
     let mut state = countdown::CountdownState::default();
     for (i, e) in config.countdown_events.iter().enumerate() {
         let mut event =
@@ -300,7 +300,7 @@ fn load_block(block: &SavedBlock) -> workout::Block {
     )
 }
 
-pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
+pub fn restore_workouts(config: &Config) -> workout::WorkoutState {
     if config.workouts.is_empty() {
         return workout::WorkoutState::default();
     }
@@ -339,7 +339,7 @@ pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
 
 // --- Persistence: restore runtime state from Config ---
 
-pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocksState {
+pub fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocksState {
     if config.world_clocks.is_empty() {
         return world_clocks::WorldClocksState::default();
     }
@@ -382,7 +382,7 @@ pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocks
     }
 }
 
-pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
+pub fn restore_alarms(config: &Config) -> alarm::AlarmState {
     // Resolve ids before building the entries. A config written before ids
     // existed has every id at 0 and gets numbered from 1, which reproduces the
     // old positional behaviour exactly for a one-time migration. After that the
@@ -491,7 +491,7 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
     }
 }
 
-pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
+pub fn restore_timers(config: &Config) -> timer::TimerState {
     let timers: Vec<timer::TimerEntry> = config
         .timers
         .iter()
@@ -541,7 +541,7 @@ pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
     }
 }
 
-pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
+pub fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     let mut state = pomodoro::PomodoroState {
         default_work_minutes: config.pomodoro_defaults.work_minutes,
         default_short_break_minutes: config.pomodoro_defaults.short_break_minutes,
@@ -588,7 +588,7 @@ pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     state
 }
 
-pub(super) fn restore_stopwatch_history(config: &Config) -> stopwatch::StopwatchState {
+pub fn restore_stopwatch_history(config: &Config) -> stopwatch::StopwatchState {
     let history: Vec<stopwatch::StopwatchRecord> = config
         .stopwatch_history
         .iter()

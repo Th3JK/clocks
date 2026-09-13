@@ -141,11 +141,19 @@ impl cosmic::Application for AppModel {
             countdown,
             active_timer_id: None,
             active_pomodoro_id: None,
-            alarm_audio_stops: HashMap::new(),
             toasts: toaster::Toasts::new(Message::CloseToast),
         };
 
         app.rebuild_nav();
+
+        // Bring the daemon up if it is not already running: this call is what
+        // D-Bus activation hangs off, so alarms work while the app is open even
+        // when autostart was never granted.
+        std::thread::spawn(|| {
+            if let Err(e) = crate::ipc::reload() {
+                eprintln!("clocks: background daemon unavailable: {e}");
+            }
+        });
 
         if app.auto_sort_alarms {
             app.sort_alarms();
@@ -345,6 +353,13 @@ impl cosmic::Application for AppModel {
                 .map(|update| Message::UpdateConfig(update.config)),
         ];
 
+        // The daemon's half of the split. Same mechanism as the config watcher
+        // above, so ringing and snooze changes arrive without a D-Bus client.
+        subscriptions.push(
+            self.core()
+                .watch_state::<crate::runtime::RuntimeState>(Self::APP_ID)
+                .map(|update| Message::UpdateRuntime(update.config)),
+        );
         subscriptions.push(Subscription::run(tick_subscription));
         subscriptions.push(listen_raw(input_subscription));
 
@@ -358,6 +373,7 @@ impl cosmic::Application for AppModel {
             message,
             Message::Tick
                 | Message::UpdateConfig(_)
+                | Message::UpdateRuntime(_)
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
                 | Message::OpenPalette
@@ -460,15 +476,25 @@ impl cosmic::Application for AppModel {
                 alarm::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Alarm);
                 }
+                // The daemon owns ringing, so these are requests rather than
+                // state changes. Fire and forget on a thread -- the resulting
+                // state arrives back through the runtime watcher, which is also
+                // what stops the audio. Doing it here as well would race.
                 alarm::Message::SnoozeAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone(), self.use_12h);
+                    std::thread::spawn(move || {
+                        if let Err(e) = crate::ipc::snooze(alarm_id) {
+                            eprintln!("clocks: could not reach the daemon: {e}");
+                        }
+                    });
                 }
                 alarm::Message::DismissAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone(), self.use_12h);
+                    std::thread::spawn(move || {
+                        if let Err(e) = crate::ipc::dismiss(alarm_id) {
+                            eprintln!("clocks: could not reach the daemon: {e}");
+                        }
+                    });
                 }
                 _ => {
                     self.alarm.update(msg.clone(), self.use_12h);
@@ -829,6 +855,44 @@ impl cosmic::Application for AppModel {
                 self.rebuild_nav();
                 return self.update_title();
             }
+            Message::UpdateRuntime(ref runtime) => {
+                // Mirror the daemon's state into the fields the alarm views
+                // already read, so nothing downstream has to know the schedule
+                // moved out of process.
+                self.alarm.ringing = runtime
+                    .ringing
+                    .iter()
+                    .map(|r| alarm::RingingAlarm {
+                        alarm_id: r.alarm_id,
+                        label: r.label.clone(),
+                        sound: r.sound.clone(),
+                        ring_secs: r.ring_secs,
+                        snooze_minutes: r.snooze_minutes,
+                        // Only the daemon expires a ring, so this is display-only.
+                        started_at: std::time::Instant::now(),
+                    })
+                    .collect();
+                self.alarm.snoozed = runtime
+                    .snoozed
+                    .iter()
+                    .map(|s| alarm::SnoozedAlarm {
+                        alarm_id: s.alarm_id,
+                        label: s.label.clone(),
+                        sound: s.sound.clone(),
+                        ring_minutes: s.ring_minutes,
+                        snooze_minutes: s.snooze_minutes,
+                        retrigger_at: s.retrigger_at,
+                    })
+                    .collect();
+                // A spent one-shot reads as off. The daemon clears the flag once
+                // the user switches the alarm back on.
+                for id in &runtime.consumed_once {
+                    if let Some(a) = self.alarm.alarms.iter_mut().find(|a| a.id == *id) {
+                        a.is_enabled = false;
+                    }
+                }
+            }
+
             Message::MoveNavPage(from, to) => {
                 // Both indices are produced by the settings rows and so are
                 // always in range; bounds-check anyway rather than risk a panic

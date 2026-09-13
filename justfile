@@ -25,6 +25,9 @@ appdata-src := 'resources' / 'app.metainfo.xml'
 desktop-src := 'resources' / 'app.desktop'
 icon-svg-src := 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg'
 audio-src := 'resources' / 'audio'
+daemon-name := name + '-daemon'
+dbus-service-src := 'resources' / 'daemon.service'
+autostart-src := 'resources' / 'daemon-autostart.desktop'
 
 # Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
@@ -36,6 +39,11 @@ icon-svg-dst := icons-dst / 'scalable' / 'apps' / icon-svg
 # Notification sounds. `resolve_sound_path` derives this from the binary's own
 # location, so it follows whatever prefix is installed to.
 audio-dst := base-dir / 'share' / name / 'audio'
+daemon-bin-dst := base-dir / 'bin' / daemon-name
+# D-Bus activation works on any distro with a session bus -- no systemd needed.
+dbus-service-dst := base-dir / 'share' / 'dbus-1' / 'services' / (appid + '.Daemon.service')
+# Starts the daemon at login so alarms fire with the app closed.
+autostart-dst := base-dir / 'etc' / 'xdg' / 'autostart' / (appid + '.Daemon.desktop')
 
 # Local user data directory for development installs
 local-data-dir := env('XDG_DATA_HOME', env('HOME') + '/.local/share')
@@ -79,6 +87,19 @@ install-local:
     -update-desktop-database {{ local-data-dir / 'applications' }}
     -gtk-update-icon-cache -f {{ local-data-dir / 'icons' / 'hicolor' }}
 
+# Register the daemon for the current user: D-Bus activation plus autostart at
+# login, both pointing at the built binary rather than an installed prefix.
+install-daemon-local: build-release
+    mkdir -p {{ local-data-dir / 'dbus-1' / 'services' }}
+    printf '[D-BUS Service]\nName=dev.th3jk.clocks.Daemon\nExec=%s\n' \
+        {{ cargo-target-dir / 'release' / daemon-name }} \
+        > {{ local-data-dir / 'dbus-1' / 'services' / (appid + '.Daemon.service') }}
+    mkdir -p {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' }}
+    printf '[Desktop Entry]\nType=Application\nName=Clocks alarms\nExec=%s\nTerminal=false\nNoDisplay=true\n' \
+        {{ cargo-target-dir / 'release' / daemon-name }} \
+        > {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' / (appid + '.Daemon.desktop') }}
+    @echo "Daemon registered. Start it now with: {{ cargo-target-dir / 'release' / daemon-name }} &"
+
 # Run the application for testing purposes
 run *args: install-local
     env RUST_BACKTRACE=full cargo run --release {{args}}
@@ -90,10 +111,14 @@ install:
     install -Dm0644 {{appdata-src}} {{appdata-dst}}
     install -Dm0644 {{icon-svg-src}} {{icon-svg-dst}}
     install -Dm0644 -t {{audio-dst}} {{audio-src}}/*.wav
+    install -Dm0755 {{ cargo-target-dir / 'release' / daemon-name }} {{daemon-bin-dst}}
+    install -Dm0644 {{dbus-service-src}} {{dbus-service-dst}}
+    install -Dm0644 {{autostart-src}} {{autostart-dst}}
 
 # Uninstalls installed files
 uninstall:
     rm {{bin-dst}} {{desktop-dst}} {{appdata-dst}} {{icon-svg-dst}}
+    rm {{daemon-bin-dst}} {{dbus-service-dst}} {{autostart-dst}}
     rm -rf {{audio-dst}}
 
 # Vendor dependencies locally

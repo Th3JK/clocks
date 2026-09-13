@@ -7,12 +7,19 @@
 //! the page models, audio playback, notifications, i18n -- lives here rather
 //! than inside the GUI binary.
 
+/// D-Bus name, config id and state id. Shared so the GUI and the daemon cannot
+/// drift apart on which config they are talking about.
+pub const APP_ID: &str = "dev.th3jk.clocks";
+
 pub mod app;
 pub mod audio;
 pub mod components;
 pub mod config;
 pub mod i18n;
+pub mod ipc;
 pub mod pages;
 pub mod quick_action;
+pub mod runtime;
+pub mod scheduler;
 pub mod sounds;
 pub mod time_format;

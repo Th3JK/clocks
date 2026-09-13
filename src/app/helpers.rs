@@ -11,11 +11,9 @@ use crate::pages::{
     Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
 };
 use cosmic_config::CosmicConfigEntry;
-use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Utc};
 use cosmic::prelude::*;
 use cosmic::widget::{self, toaster};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 impl AppModel {
     /// Central tick handler: drives stopwatch, timers, pomodoro, and alarm logic
@@ -72,38 +70,11 @@ impl AppModel {
             }
         }
 
-        // Alarm: check for expired ringing (auto-snooze)
-        let expired = self.alarm.check_ring_expired();
-        for alarm_id in expired {
-            self.stop_alarm_audio(alarm_id);
-            self.alarm
-                .update(alarm::Message::SnoozeAlarm(alarm_id), self.use_12h);
-        }
-
-        // Alarm: check snoozed alarms that should re-trigger
-        let snoozed_triggers = self.alarm.check_snoozed();
-        for info in &snoozed_triggers {
-            audio::send_notification(&fl!("notification-alarm-snoozed"), &info.label);
-            self.start_alarm_audio(info);
-            self.alarm.start_ringing(info);
-        }
-        if !snoozed_triggers.is_empty() {
-            self.save_state();
-        }
-
-        // Alarm: check scheduled alarms
-        let now = Local::now();
-        let triggered =
-            self.alarm
-                .check_triggers(now.hour() as u8, now.minute() as u8, now.weekday());
-        if !triggered.is_empty() {
-            for info in &triggered {
-                audio::send_notification(&fl!("notification-alarm"), &info.label);
-                self.start_alarm_audio(info);
-                self.alarm.start_ringing(info);
-            }
-            self.save_state();
-        }
+        // Alarms are deliberately absent: `clocks-daemon` owns them. It fires
+        // whether or not this window exists, which is the entire point of the
+        // split, and duplicating the schedule here would ring twice whenever
+        // both processes are up. Ringing state arrives through the runtime
+        // config entry instead -- see `Message::UpdateRuntime`.
     }
 
     /// Sort alarms by time (hour, minute).
@@ -175,24 +146,6 @@ impl AppModel {
         );
         if let Err(e) = config.write_entry(ctx) {
             eprintln!("Failed to save config: {:?}", e);
-        }
-    }
-
-    pub(super) fn start_alarm_audio(&mut self, info: &alarm::AlarmTriggerInfo) {
-        let stop = Arc::new(AtomicBool::new(false));
-        self.alarm_audio_stops.insert(info.alarm_id, stop.clone());
-        let sound = info.sound.clone();
-        let ring_secs = info.ring_secs;
-        std::thread::spawn(move || {
-            if let Err(e) = audio::play_alarm_sound_loop(&sound, ring_secs, stop) {
-                eprintln!("Alarm audio error: {}", e);
-            }
-        });
-    }
-
-    pub(super) fn stop_alarm_audio(&mut self, alarm_id: u32) {
-        if let Some(stop) = self.alarm_audio_stops.remove(&alarm_id) {
-            stop.store(true, Ordering::Relaxed);
         }
     }
 
