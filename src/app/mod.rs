@@ -17,6 +17,25 @@ use std::sync::atomic::AtomicBool;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../../resources/icons/hicolor/scalable/apps/icon.svg");
+/// Timer and Pomodoro have no reliable freedesktop symbolic icon (`timer-symbolic`
+/// is absent from most themes), so both are bundled and loaded from bytes.
+pub(crate) const TIMER_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/timer-symbolic.svg");
+pub(crate) const POMODORO_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/pomodoro-symbolic.svg");
+pub(crate) const COUNTDOWN_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/countdown-symbolic.svg");
+
+/// Build a themed icon handle from bundled SVG bytes.
+///
+/// `icon::from_svg_bytes` leaves `symbolic: false`, which stops libcosmic from
+/// recolouring the glyph for the active theme — it would render black on dark
+/// backgrounds. Setting the flag opts the icon into theme tinting.
+pub(crate) fn bundled_icon(bytes: &'static [u8]) -> cosmic::widget::icon::Handle {
+    let mut handle = cosmic::widget::icon::from_svg_bytes(bytes);
+    handle.symbolic = true;
+    handle
+}
 
 // --- Destructive action confirmation ---
 
@@ -48,8 +67,16 @@ pub struct AppModel {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     config: Config,
     config_context: Option<cosmic_config::Config>,
+    /// The stored preference. Persisted as-is so choosing System survives.
+    time_format: crate::time_format::TimeFormat,
+    /// `time_format` resolved to a concrete flag, recomputed whenever the
+    /// setting changes. Kept separate so the resolved value is never written
+    /// back over the stored preference.
     use_12h: bool,
     show_shortcuts_dialog: bool,
+    /// Quick-action palette state (session-only).
+    show_palette: bool,
+    palette_input: String,
 
     // Confirmation dialog state
     pending_destructive_action: Option<DestructiveAction>,
@@ -116,6 +143,12 @@ pub enum Message {
     PageShortcutSkip,
     ShowShortcutsDialog,
     CloseShortcutsDialog,
+    // Quick-action palette
+    OpenPalette,
+    ClosePalette,
+    PaletteInput(String),
+    PaletteSubmit,
+    PaletteRun(crate::quick_action::QuickAction),
     // Confirmation dialogs
     ConfirmDestructiveAction,
     CancelDestructiveAction,
@@ -145,6 +178,7 @@ pub enum MenuAction {
     About,
     Settings,
     Shortcuts,
+    QuickAction,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -155,6 +189,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
             MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
             MenuAction::Shortcuts => Message::ShowShortcutsDialog,
+            MenuAction::QuickAction => Message::OpenPalette,
         }
     }
 }

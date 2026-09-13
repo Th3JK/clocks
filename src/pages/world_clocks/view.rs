@@ -136,7 +136,7 @@ impl WorldClocksState {
             for clock in &self.clocks {
                 let time_in_tz = now_utc.with_timezone(&clock.timezone);
                 let time_str = if use_12h {
-                    time_in_tz.format("%I:%M %p").to_string()
+                    crate::time_format::format_time_of_day(&time_in_tz, true)
                 } else {
                     time_in_tz.format("%H:%M").to_string()
                 };
@@ -249,7 +249,7 @@ impl WorldClocksState {
 
                     let time_in_tz = now_utc.with_timezone(&clock.timezone);
                     let time_str = if use_12h {
-                        time_in_tz.format("%I:%M %p").to_string()
+                        crate::time_format::format_time_of_day(&time_in_tz, true)
                     } else {
                         time_in_tz.format("%H:%M").to_string()
                     };
@@ -359,7 +359,7 @@ impl WorldClocksState {
                     .map(|clock| {
                         let time_in_tz = now_utc.with_timezone(&clock.timezone);
                         let time_str = if use_12h {
-                            time_in_tz.format("%I:%M %p").to_string()
+                            crate::time_format::format_time_of_day(&time_in_tz, true)
                         } else {
                             time_in_tz.format("%H:%M").to_string()
                         };
@@ -525,7 +525,7 @@ impl WorldClocksState {
 
         // ── Center: large time display ──
         let time_str = if use_12h {
-            time_in_tz.format("%I:%M:%S %p").to_string()
+            crate::time_format::format_time_of_day_secs(&time_in_tz, true)
         } else {
             time_in_tz.format("%H:%M:%S").to_string()
         };
@@ -613,7 +613,7 @@ impl WorldClocksState {
     fn format_sun_dt(dt: chrono::DateTime<Utc>, tz: chrono_tz::Tz, use_12h: bool) -> String {
         let local = dt.with_timezone(&tz);
         if use_12h {
-            local.format("%I:%M %p").to_string()
+            crate::time_format::format_time_of_day(&local, true)
         } else {
             local.format("%H:%M").to_string()
         }

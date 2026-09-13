@@ -22,7 +22,8 @@ pub(super) fn build_config_from_state(
     sw: &stopwatch::StopwatchState,
     ch: &chess::ChessState,
     wo: &workout::WorkoutState,
-    use_12h: bool,
+    co: &countdown::CountdownState,
+    time_format: crate::time_format::TimeFormat,
     confirm_delete_alarm: bool,
     confirm_delete_timer: bool,
     confirm_delete_world_clock: bool,
@@ -172,7 +173,11 @@ pub(super) fn build_config_from_state(
         timers,
         pomodoros,
         pomodoro_defaults,
-        use_12h,
+        // The legacy flag mirrors the preference only when it is concrete; a
+        // System preference leaves it at its last explicit value so an older
+        // build still gets something sensible.
+        use_12h: matches!(time_format, crate::time_format::TimeFormat::Twelve),
+        time_format: Some(time_format),
         confirm_delete_alarm,
         confirm_delete_timer,
         confirm_delete_world_clock,

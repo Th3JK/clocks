@@ -17,8 +17,16 @@ pub struct Config {
     pub pomodoros: Vec<SavedPomodoro>,
     /// Pomodoro default durations
     pub pomodoro_defaults: PomodoroDefaults,
-    /// Use 12-hour (AM/PM) time format instead of 24-hour
+    /// Legacy 12/24-hour flag, superseded by `time_format`.
+    ///
+    /// Kept so configs written before `time_format` existed still migrate: when
+    /// `time_format` is absent this value decides, preserving the user's
+    /// existing display rather than silently switching them to System.
     pub use_12h: bool,
+    /// 24-hour, 12-hour, or follow the desktop. `None` means a config written
+    /// before this field existed — migrate from `use_12h`.
+    #[serde(default)]
+    pub time_format: Option<crate::time_format::TimeFormat>,
     /// Confirmation dialog settings (default: true = show confirmation)
     #[serde(default = "default_true")]
     pub confirm_delete_alarm: bool,
@@ -69,6 +77,7 @@ impl Default for Config {
             pomodoros: Vec::new(),
             pomodoro_defaults: PomodoroDefaults::default(),
             use_12h: false,
+            time_format: Some(crate::time_format::TimeFormat::System),
             confirm_delete_alarm: true,
             confirm_delete_timer: true,
             confirm_delete_world_clock: true,

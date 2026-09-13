@@ -25,7 +25,7 @@ pub enum Message {
 }
 
 /// Extract the city name from a timezone identifier (last segment after `/`).
-fn tz_city_name(tz: Tz) -> String {
+pub fn tz_city_name(tz: Tz) -> String {
     let name = tz.name();
     name.rsplit('/')
         .next()

@@ -160,7 +160,8 @@ impl AppModel {
             &self.stopwatch,
             &self.chess,
             &self.workout,
-            self.use_12h,
+            &self.countdown,
+            self.time_format,
             self.confirm_delete_alarm,
             self.confirm_delete_timer,
             self.confirm_delete_world_clock,
@@ -191,6 +192,183 @@ impl AppModel {
         if let Some(stop) = self.alarm_audio_stops.remove(&alarm_id) {
             stop.store(true, Ordering::Relaxed);
         }
+    }
+
+    /// Jump to a page by identity rather than position, so this keeps working
+    /// if the sidebar order ever becomes user-defined.
+    pub(super) fn activate_page(&mut self, page: Page) {
+        let target = self
+            .nav
+            .iter()
+            .find(|e| self.nav.data::<Page>(*e) == Some(&page));
+        if let Some(entity) = target {
+            self.nav.activate(entity);
+        }
+    }
+
+    /// Rows offered in the palette, before filtering.
+    ///
+    /// The user's own saved items come first — those are what gets reached for
+    /// repeatedly — followed by the built-in durations and every page.
+    pub(super) fn palette_suggestions(&self) -> Vec<crate::quick_action::QuickAction> {
+        use crate::quick_action::QuickAction;
+        let mut out: Vec<QuickAction> = Vec::new();
+        out.extend(self.timer.timers.iter().map(|t| QuickAction::StartTimer(t.id)));
+        out.extend(
+            self.pomodoro
+                .timers
+                .iter()
+                .map(|p| QuickAction::StartPomodoro(p.id)),
+        );
+        out.extend(
+            self.workout
+                .workouts
+                .iter()
+                .map(|w| QuickAction::StartWorkout(w.id)),
+        );
+        out.extend(crate::quick_action::presets());
+        out
+    }
+
+    /// Carry out a parsed quick action.
+    ///
+    /// Page `update()` methods are called directly rather than routed through
+    /// `Message::<Page>(..)`: the app-level arms for `StartNew`/`OpenSettings`
+    /// open the context drawer and move focus, which is wrong for something
+    /// invoked from the palette.
+    pub(super) fn run_quick_action(
+        &mut self,
+        action: crate::quick_action::QuickAction,
+    ) -> Task<cosmic::Action<Message>> {
+        use crate::quick_action::QuickAction;
+
+        match action {
+            QuickAction::Timer { secs, label } => {
+                // `StartNew` is the only thing that clears `edit_id`; without it
+                // a previous edit would make `SaveTimer` overwrite that timer.
+                self.timer.update(timer::Message::StartNew);
+                self.timer
+                    .update(timer::Message::EditHours((secs / 3600) as u8));
+                self.timer
+                    .update(timer::Message::EditMinutes(((secs % 3600) / 60) as u8));
+                self.timer
+                    .update(timer::Message::EditSeconds((secs % 60) as u8));
+                if let Some(label) = label {
+                    self.timer.update(timer::Message::EditLabel(label));
+                }
+                self.timer.update(timer::Message::SaveTimer);
+                // Quick actions are a "do it now" gesture, so start it running.
+                if let Some(id) = self.timer.timers.last().map(|t| t.id) {
+                    self.active_timer_id = Some(id);
+                    self.timer.update(timer::Message::StartTimer(id));
+                }
+                self.activate_page(Page::Timer);
+            }
+
+            QuickAction::Alarm {
+                hour,
+                minute,
+                label,
+            } => {
+                // The alarm page has no SetHour/SetMinute message, only
+                // increment/decrement, so the edit buffer is written directly.
+                // `SaveAlarm` converts through `hour12_to_24` only in 12h mode,
+                // so the stored hour has to match the active format.
+                let (edit_hour, is_pm) = if self.use_12h {
+                    let (h, pm) = crate::time_format::to_12h(hour);
+                    (h as u8, pm)
+                } else {
+                    (hour as u8, false)
+                };
+                self.alarm.editing = Some(alarm::AlarmEdit {
+                    id: None,
+                    hour: edit_hour,
+                    minute: minute as u8,
+                    is_pm,
+                    label: label.unwrap_or_default(),
+                    repeat_mode: alarm::RepeatMode::Once,
+                    sound: "Bell".to_string(),
+                    snooze_minutes: 5,
+                    ring_minutes: 1,
+                });
+                self.alarm
+                    .update(alarm::Message::SaveAlarm, self.use_12h);
+                self.activate_page(Page::Alarm);
+                // Reuse the normal "rings in X" toast.
+                if let Some(alarm) = self
+                    .alarm
+                    .last_saved_id
+                    .and_then(|id| self.alarm.alarms.iter().find(|a| a.id == id))
+                    .cloned()
+                {
+                    let task = self.push_alarm_toast(&alarm);
+                    self.save_state();
+                    return task;
+                }
+            }
+
+            QuickAction::Countdown {
+                year,
+                month,
+                day,
+                label,
+            } => {
+                self.countdown.update(countdown::Message::OpenSettings);
+                self.countdown
+                    .update(countdown::Message::EditDate(year, month, day));
+                if let Some(label) = label {
+                    self.countdown.update(countdown::Message::EditLabel(label));
+                }
+                self.countdown.update(countdown::Message::AddEvent);
+                self.activate_page(Page::Countdown);
+            }
+
+            QuickAction::Clock { query } => {
+                // Same matching the world-clocks search uses, so the palette and
+                // the sidebar agree on what a city name means.
+                let q = query.to_lowercase();
+                let found = chrono_tz::TZ_VARIANTS.iter().find(|tz| {
+                    tz.name().to_lowercase().contains(&q)
+                        || world_clocks::tz_city_name(**tz).to_lowercase().contains(&q)
+                });
+                if let Some(tz) = found {
+                    self.world_clocks
+                        .update(world_clocks::Message::AddClock(*tz));
+                }
+                self.activate_page(Page::WorldClocks);
+            }
+
+            QuickAction::Navigate(page) => {
+                self.activate_page(page);
+            }
+
+            // Launchers for saved items. Each starts from the top, which is what
+            // "start" means from a palette — resuming is the card's job.
+            QuickAction::StartTimer(id) => {
+                if self.timer.timers.iter().any(|t| t.id == id) {
+                    self.active_timer_id = Some(id);
+                    self.timer.update(timer::Message::ResetTimer(id));
+                    self.timer.update(timer::Message::StartTimer(id));
+                    self.activate_page(Page::Timer);
+                }
+            }
+            QuickAction::StartPomodoro(id) => {
+                if self.pomodoro.timers.iter().any(|p| p.id == id) {
+                    self.active_pomodoro_id = Some(id);
+                    self.pomodoro.update(pomodoro::Message::Start(id));
+                    self.activate_page(Page::Pomodoro);
+                }
+            }
+            QuickAction::StartWorkout(id) => {
+                if self.workout.workouts.iter().any(|w| w.id == id) {
+                    self.workout.update(workout::Message::Start(id));
+                    self.activate_page(Page::Workout);
+                }
+            }
+        }
+
+        self.save_state();
+        self.update_title()
     }
 
     pub(super) fn active_timer(&self) -> Option<&timer::TimerEntry> {

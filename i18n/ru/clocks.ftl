@@ -2,6 +2,7 @@ app-title = Часы
 about = О программе
 settings = Настройки
 repository = Репозиторий
+report-issue = Сообщить о проблеме
 view = Вид
 
 # Navigation
@@ -28,6 +29,7 @@ add = Добавить
 
 # Settings
 time-format = Формат времени
+time-format-system = Системный
 time-format-24h = 24-часовой
 time-format-12h = 12-часовой (AM/PM)
 
@@ -181,6 +183,17 @@ pomodoro-transition = { $label }: { $prev } завершена! Начинает
 pomodoro-settings = Настройки Помодоро
 
 # Shortcuts
+palette-title = Быстрое действие
+palette-placeholder = напр. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Введите длительность, время или название страницы
+palette-no-match = Ничего не найдено
+palette-run = Выполнить
+palette-preview-timer = Запустить таймер на { $duration } { $label }
+palette-preview-alarm = Поставить будильник на { $time } { $label }
+palette-preview-countdown = Добавить отсчёт до { $date } { $label }
+palette-preview-clock = Добавить мировые часы для «{ $query }»
+palette-preview-navigate = Перейти к { $page }
+palette-preview-start = Запустить { $label }
 shortcuts = Горячие клавиши
 shortcuts-description = Горячие клавиши, доступные в этом приложении
 shortcuts-close = Закрыть

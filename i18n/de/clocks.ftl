@@ -2,6 +2,7 @@ app-title = Uhren
 about = Über
 settings = Einstellungen
 repository = Repository
+report-issue = Problem melden
 view = Ansicht
 
 # Navigation
@@ -28,6 +29,7 @@ add = Hinzufügen
 
 # Settings
 time-format = Zeitformat
+time-format-system = System
 time-format-24h = 24-Stunden
 time-format-12h = 12-Stunden (AM/PM)
 
@@ -181,6 +183,17 @@ pomodoro-transition = { $label }: { $prev } abgeschlossen! { $next } beginnt
 pomodoro-settings = Pomodoro-Einstellungen
 
 # Shortcuts
+palette-title = Schnellaktion
+palette-placeholder = z. B. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Dauer, Uhrzeit oder Seitenname eingeben
+palette-no-match = Keine Übereinstimmung
+palette-run = Ausführen
+palette-preview-timer = Timer über { $duration } starten { $label }
+palette-preview-alarm = Wecker auf { $time } stellen { $label }
+palette-preview-countdown = Countdown bis { $date } hinzufügen { $label }
+palette-preview-clock = Weltzeituhr für „{ $query }“ hinzufügen
+palette-preview-navigate = Zu { $page } wechseln
+palette-preview-start = { $label } starten
 shortcuts = Tastenkürzel
 shortcuts-description = Verfügbare Tastenkürzel in dieser Anwendung
 shortcuts-close = Schließen

@@ -6,6 +6,8 @@ mod components;
 mod config;
 mod i18n;
 mod pages;
+mod quick_action;
+mod time_format;
 
 fn main() -> cosmic::iced::Result {
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();

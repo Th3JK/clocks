@@ -10,12 +10,20 @@ prefix := '/usr'
 # The location of the cargo target directory.
 cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 
-# Application's appstream metadata
+# Installed names. These are derived from the app ID because the desktop entry
+# has to be named after the Wayland app_id for the compositor to resolve the
+# window's icon, and the icon has to be named after the entry's `Icon=` key.
 appdata := appid + '.metainfo.xml'
 # Application's desktop entry
 desktop := appid + '.desktop'
 # Application's icon.
 icon-svg := appid + '.svg'
+
+# Source names in `resources/`, which differ from the installed names above.
+# Installing from the installed name silently breaks every install recipe.
+appdata-src := 'resources' / 'app.metainfo.xml'
+desktop-src := 'resources' / 'app.desktop'
+icon-svg-src := 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg'
 
 # Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
@@ -62,8 +70,8 @@ check-json: (check '--message-format=json')
 # Install icon and desktop entry to user's local data dir so the system
 # can resolve the app icon when running via `cargo run` or `just run`.
 install-local:
-    install -Dm0644 {{ 'resources' / desktop }} {{ local-data-dir / 'applications' / desktop }}
-    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg' }} {{ local-data-dir / 'icons' / 'hicolor' / 'scalable' / 'apps' / icon-svg }}
+    install -Dm0644 {{desktop-src}} {{ local-data-dir / 'applications' / desktop }}
+    install -Dm0644 {{icon-svg-src}} {{ local-data-dir / 'icons' / 'hicolor' / 'scalable' / 'apps' / icon-svg }}
     -update-desktop-database {{ local-data-dir / 'applications' }}
     -gtk-update-icon-cache -f {{ local-data-dir / 'icons' / 'hicolor' }}
 
@@ -74,9 +82,9 @@ run *args: install-local
 # Installs files
 install:
     install -Dm0755 {{ cargo-target-dir / 'release' / name }} {{bin-dst}}
-    install -Dm0644 {{ 'resources' / desktop }} {{desktop-dst}}
-    install -Dm0644 {{ 'resources' / appdata }} {{appdata-dst}}
-    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg' }} {{icon-svg-dst}}
+    install -Dm0644 {{desktop-src}} {{desktop-dst}}
+    install -Dm0644 {{appdata-src}} {{appdata-dst}}
+    install -Dm0644 {{icon-svg-src}} {{icon-svg-dst}}
 
 # Uninstalls installed files
 uninstall:

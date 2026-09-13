@@ -2,6 +2,7 @@ app-title = Hodiny
 about = O aplikaci
 settings = Nastavení
 repository = Úložiště
+report-issue = Nahlásit problém
 view = Zobrazení
 
 # Navigation
@@ -28,6 +29,7 @@ add = Přidat
 
 # Settings
 time-format = Formát času
+time-format-system = Systémový
 time-format-24h = 24hodinový
 time-format-12h = 12hodinový (AM/PM)
 
@@ -181,6 +183,17 @@ pomodoro-transition = { $label }: { $prev } dokončena! Začíná { $next }
 pomodoro-settings = Nastavení Pomodoro
 
 # Shortcuts
+palette-title = Rychlá akce
+palette-placeholder = např. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Zadejte dobu, čas nebo název stránky
+palette-no-match = Nic neodpovídá
+palette-run = Spustit
+palette-preview-timer = Spustit časovač { $duration } { $label }
+palette-preview-alarm = Nastavit budík na { $time } { $label }
+palette-preview-countdown = Přidat odpočet do { $date } { $label }
+palette-preview-clock = Přidat světový čas pro „{ $query }“
+palette-preview-navigate = Přejít na { $page }
+palette-preview-start = Spustit { $label }
 shortcuts = Klávesové zkratky
 shortcuts-description = Klávesové zkratky dostupné v této aplikaci
 shortcuts-close = Zavřít

@@ -126,8 +126,16 @@ impl cosmic::Application for AppModel {
         let stopwatch = restore_stopwatch_history(&config);
         let chess = restore_chess(&config);
         let workout = restore_workouts(&config);
+        let countdown = restore_countdowns(&config);
 
-        let use_12h = config.use_12h;
+        // A config written before `time_format` existed carries `None`; fall back
+        // to the legacy flag so an existing user keeps the display they had.
+        let time_format = config.time_format.unwrap_or(if config.use_12h {
+            crate::time_format::TimeFormat::Twelve
+        } else {
+            crate::time_format::TimeFormat::TwentyFour
+        });
+        let use_12h = time_format.use_12h();
         let confirm_delete_alarm = config.confirm_delete_alarm;
         let confirm_delete_timer = config.confirm_delete_timer;
         let confirm_delete_world_clock = config.confirm_delete_world_clock;
@@ -142,11 +150,14 @@ impl cosmic::Application for AppModel {
             context_page: ContextPage::default(),
             about,
             nav,
-            key_binds: HashMap::new(),
+            key_binds: key_binds(),
             config,
             config_context,
+            time_format,
             use_12h,
             show_shortcuts_dialog: false,
+            show_palette: false,
+            palette_input: String::new(),
             pending_destructive_action: None,
             confirm_dialog_dont_show_again: false,
             confirm_delete_alarm,
@@ -186,13 +197,16 @@ impl cosmic::Application for AppModel {
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            widget::button::custom(widget::text(fl!("view")))
+            // The system glyph rather than a bundled one: this sits next to the
+            // nav-bar toggle, and only the real icon matches its weight.
+            widget::button::custom(icon::from_name("open-menu-symbolic").size(16).icon())
                 .padding([4, 12])
                 .class(cosmic::theme::Button::MenuRoot)
                 .apply(Element::from),
             menu::items(
                 &self.key_binds,
                 vec![
+                    menu::Item::Button(fl!("palette-title"), None, MenuAction::QuickAction),
                     menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
                     menu::Item::Button(fl!("shortcuts"), None, MenuAction::Shortcuts),
                     menu::Item::Button(fl!("about"), None, MenuAction::About),
@@ -344,6 +358,10 @@ impl cosmic::Application for AppModel {
             return Some(dialog.into());
         }
 
+        if self.show_palette {
+            return Some(self.palette_view());
+        }
+
         if self.pending_destructive_action.is_some() {
             return Some(self.confirmation_dialog_view());
         }
@@ -377,6 +395,9 @@ impl cosmic::Application for AppModel {
                 | Message::UpdateConfig(_)
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
+                | Message::OpenPalette
+                | Message::ClosePalette
+                | Message::PaletteInput(_)
                 | Message::CancelDestructiveAction
                 | Message::ToggleConfirmDontShowAgain(_)
                 | Message::CloseToast(_)
@@ -728,7 +749,12 @@ impl cosmic::Application for AppModel {
             }
 
             Message::UpdateConfig(config) => {
-                self.use_12h = config.use_12h;
+                self.time_format = config.time_format.unwrap_or(if config.use_12h {
+                    crate::time_format::TimeFormat::Twelve
+                } else {
+                    crate::time_format::TimeFormat::TwentyFour
+                });
+                self.use_12h = self.time_format.use_12h();
                 self.confirm_delete_alarm = config.confirm_delete_alarm;
                 self.confirm_delete_timer = config.confirm_delete_timer;
                 self.confirm_delete_world_clock = config.confirm_delete_world_clock;
@@ -820,8 +846,51 @@ impl cosmic::Application for AppModel {
                 self.core.window.show_context = false;
             }
 
-            Message::CloseShortcutsDialog => {
+            Message::OpenPalette => {
+                self.show_palette = true;
+                self.palette_input.clear();
+                // Close anything that would fight the palette for focus.
+                self.core.window.show_context = false;
                 self.show_shortcuts_dialog = false;
+                return widget::text_input::focus(widget::Id::new("palette-input"));
+            }
+            Message::ClosePalette => {
+                self.show_palette = false;
+                self.palette_input.clear();
+            }
+            Message::PaletteInput(text) => {
+                self.palette_input = text;
+            }
+            Message::PaletteSubmit => {
+                let action = crate::quick_action::parse(&self.palette_input);
+                self.show_palette = false;
+                self.palette_input.clear();
+                if let Some(action) = action {
+                    return self.run_quick_action(action);
+                }
+            }
+
+            Message::PaletteRun(action) => {
+                self.show_palette = false;
+                self.palette_input.clear();
+                return self.run_quick_action(action);
+            }
+
+            Message::CloseShortcutsDialog => {
+                // Escape is a general "back out of the current thing". The
+                // shortcuts dialog takes priority; otherwise it leaves the focus
+                // mode of whichever page is showing one.
+                if self.show_shortcuts_dialog {
+                    self.show_shortcuts_dialog = false;
+                } else {
+                    match self.nav.active_data::<Page>() {
+                        Some(Page::Timer) => self.timer.focused_id = None,
+                        Some(Page::Workout) => self.workout.focused_id = None,
+                        Some(Page::Pomodoro) => self.pomodoro.focused_id = None,
+                        Some(Page::WorldClocks) => self.world_clocks.selected_clock_id = None,
+                        _ => {}
+                    }
+                }
             }
 
             Message::ConfirmDestructiveAction => {
@@ -949,4 +1018,21 @@ impl cosmic::Application for AppModel {
         self.core.window.show_context = false;
         self.update_title()
     }
+}
+
+/// Keyboard shortcuts shown beside menu items.
+///
+/// `menu::items` looks each action up here and renders the binding; an empty map
+/// means the menu shows no shortcuts at all. These must be kept in step with the
+/// real bindings in `subscriptions::input_subscription`.
+fn key_binds() -> HashMap<menu::KeyBind, MenuAction> {
+    let mut binds = HashMap::new();
+    binds.insert(
+        menu::KeyBind {
+            modifiers: vec![menu::key_bind::Modifier::Ctrl],
+            key: cosmic::iced::keyboard::Key::Character("k".into()),
+        },
+        MenuAction::QuickAction,
+    );
+    binds
 }

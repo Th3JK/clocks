@@ -15,22 +15,31 @@ impl AppModel {
 
         col = col.push(widget::text::body(fl!("time-format")));
 
-        let btn_24h = if self.use_12h {
-            widget::button::standard(fl!("time-format-24h")).on_press(Message::SetTimeFormat(false))
-        } else {
-            widget::button::suggested(fl!("time-format-24h"))
-                .on_press(Message::SetTimeFormat(false))
-        };
-        let btn_12h = if self.use_12h {
-            widget::button::suggested(fl!("time-format-12h")).on_press(Message::SetTimeFormat(true))
-        } else {
-            widget::button::standard(fl!("time-format-12h")).on_press(Message::SetTimeFormat(true))
+        // Three-way: System follows the desktop (falling back to the locale),
+        // the other two are explicit. Selection is highlighted by swapping
+        // suggested/standard, matching the rest of the app.
+        let format_button = |label: String, value: crate::time_format::TimeFormat| {
+            if self.time_format == value {
+                widget::button::suggested(label).on_press(Message::SetTimeFormat(value))
+            } else {
+                widget::button::standard(label).on_press(Message::SetTimeFormat(value))
+            }
         };
 
-        let row = widget::row::with_capacity(2)
+        let row = widget::row::with_capacity(3)
             .spacing(8)
-            .push(btn_24h)
-            .push(btn_12h);
+            .push(format_button(
+                fl!("time-format-system"),
+                crate::time_format::TimeFormat::System,
+            ))
+            .push(format_button(
+                fl!("time-format-24h"),
+                crate::time_format::TimeFormat::TwentyFour,
+            ))
+            .push(format_button(
+                fl!("time-format-12h"),
+                crate::time_format::TimeFormat::Twelve,
+            ));
         col = col.push(row);
 
         col = col.push(widget::divider::horizontal::default());
@@ -99,6 +108,191 @@ impl AppModel {
         col.into()
     }
 
+    /// Quick-action palette. Shows a live reading of what the current text
+    /// would do, so the action is never a surprise on Enter.
+    pub(super) fn palette_view(&self) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let parsed = crate::quick_action::parse(&self.palette_input);
+        let preview = match &parsed {
+            Some(action) => self.describe_action(action),
+            None if self.palette_input.trim().is_empty() => fl!("palette-hint"),
+            None => fl!("palette-no-match"),
+        };
+
+        // Rows: whatever the text parses to first (so Enter and clicking the top
+        // row agree), then the suggestions, filtered on their visible text.
+        let query = self.palette_input.trim().to_lowercase();
+        let mut rows: Vec<Element<'_, Message>> = Vec::new();
+        if let Some(action) = &parsed {
+            rows.push(self.palette_row(action, true));
+        }
+        for action in self.palette_suggestions() {
+            if Some(&action) == parsed.as_ref() {
+                continue;
+            }
+            if query.is_empty() || self.describe_action(&action).to_lowercase().contains(&query) {
+                rows.push(self.palette_row(&action, false));
+            }
+        }
+
+        let list = widget::scrollable(
+            widget::column::with_children(rows)
+                .spacing(spacing.space_xxxs)
+                .width(Length::Fill),
+        )
+        .height(Length::Fixed(240.0));
+
+        let control = widget::column::with_capacity(3)
+            .spacing(spacing.space_xs)
+            .push(
+                widget::text_input(fl!("palette-placeholder"), &self.palette_input)
+                    .id(widget::Id::new("palette-input"))
+                    .on_input(Message::PaletteInput)
+                    // Enter must come from the input: the global key subscription
+                    // only sees keys no focused widget consumed, and a focused
+                    // text input consumes Enter.
+                    .on_submit(|_| Message::PaletteSubmit)
+                    // Escape unfocuses the input and is captured there, so it
+                    // never reaches the global handler — this is the only hook
+                    // that sees it. It also fires on click-outside, which is why
+                    // every button below carries its own payload rather than
+                    // re-reading `palette_input`.
+                    .on_unfocus(Message::ClosePalette),
+            )
+            .push(widget::text::caption(preview))
+            .push(list);
+
+        let mut dialog = widget::dialog()
+            .title(fl!("palette-title"))
+            .control(control)
+            .secondary_action(
+                widget::button::standard(fl!("cancel")).on_press(Message::ClosePalette),
+            );
+
+        // Only offer the confirm button when there is something to confirm. It
+        // carries the parsed action rather than re-reading the input, because
+        // pressing it unfocuses the input and that clears `palette_input` first.
+        if let Some(action) = parsed {
+            dialog = dialog.primary_action(
+                widget::button::suggested(fl!("palette-run"))
+                    .on_press(Message::PaletteRun(action)),
+            );
+        }
+
+        dialog.into()
+    }
+
+    /// A clickable palette row. `primary` marks the parsed-from-text row so it
+    /// reads as the thing Enter would do.
+    fn palette_row(
+        &self,
+        action: &crate::quick_action::QuickAction,
+        primary: bool,
+    ) -> Element<'_, Message> {
+        let label = self.describe_action(action);
+        widget::button::custom(
+            widget::container(widget::text::body(label))
+                .padding(6)
+                .width(Length::Fill),
+        )
+        .class(if primary {
+            cosmic::theme::Button::Suggested
+        } else {
+            cosmic::theme::Button::Text
+        })
+        .width(Length::Fill)
+        .on_press(Message::PaletteRun(action.clone()))
+        .into()
+    }
+
+    /// One-line description of what an action will do.
+    fn describe_action(&self, action: &crate::quick_action::QuickAction) -> String {
+        use crate::quick_action::QuickAction;
+        match action {
+            QuickAction::Timer { secs, label } => fl!(
+                "palette-preview-timer",
+                duration = crate::components::format_duration_hms(std::time::Duration::from_secs(
+                    *secs
+                )),
+                label = label.clone().unwrap_or_default()
+            ),
+            QuickAction::Alarm {
+                hour,
+                minute,
+                label,
+            } => fl!(
+                "palette-preview-alarm",
+                time = crate::time_format::format_hm(*hour, *minute, self.use_12h),
+                label = label.clone().unwrap_or_default()
+            ),
+            QuickAction::Countdown {
+                year,
+                month,
+                day,
+                label,
+            } => fl!(
+                "palette-preview-countdown",
+                date = format!("{year:04}-{month:02}-{day:02}"),
+                label = label.clone().unwrap_or_default()
+            ),
+            QuickAction::Clock { query } => {
+                fl!("palette-preview-clock", query = query.clone())
+            }
+            QuickAction::Navigate(page) => fl!(
+                "palette-preview-navigate",
+                page = self.page_title(*page)
+            ),
+            // Launchers carry only an id, so the label is looked up here — a row
+            // should read "Start Morning HIIT", not "Start workout 3".
+            QuickAction::StartTimer(id) => fl!(
+                "palette-preview-start",
+                label = self
+                    .timer
+                    .timers
+                    .iter()
+                    .find(|t| t.id == *id)
+                    .map(|t| t.label.clone())
+                    .unwrap_or_default()
+            ),
+            QuickAction::StartPomodoro(id) => fl!(
+                "palette-preview-start",
+                label = self
+                    .pomodoro
+                    .timers
+                    .iter()
+                    .find(|p| p.id == *id)
+                    .map(|p| p.label.clone())
+                    .unwrap_or_default()
+            ),
+            QuickAction::StartWorkout(id) => fl!(
+                "palette-preview-start",
+                label = self
+                    .workout
+                    .workouts
+                    .iter()
+                    .find(|w| w.id == *id)
+                    .map(|w| w.label.clone())
+                    .unwrap_or_default()
+            ),
+        }
+    }
+
+    /// The nav label for a page, so previews match the sidebar.
+    fn page_title(&self, page: crate::pages::Page) -> String {
+        use crate::pages::Page;
+        match page {
+            Page::WorldClocks => fl!("nav-world-clocks"),
+            Page::Stopwatch => fl!("nav-stopwatch"),
+            Page::Alarm => fl!("nav-alarm"),
+            Page::Timer => fl!("nav-timer"),
+            Page::Pomodoro => fl!("nav-pomodoro"),
+            Page::Chess => fl!("nav-chess"),
+            Page::Workout => fl!("nav-workout"),
+            Page::Countdown => fl!("nav-countdown"),
+        }
+    }
+
     pub(super) fn shortcuts_dialog_view(&self) -> Element<'_, Message> {
         let spacing = 10;
         let mut col = widget::column::with_capacity(26).spacing(spacing);
@@ -118,6 +312,10 @@ impl AppModel {
             fl!("shortcuts-show-shortcuts"),
             &["Ctrl", "?"],
         ));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-quick-action"),
+            &["Ctrl", "K"],
+        ));
 
         col = col.push(widget::divider::horizontal::default());
 
@@ -128,6 +326,9 @@ impl AppModel {
         col = col.push(Self::shortcut_row(fl!("nav-alarm"), &["Alt", "3"]));
         col = col.push(Self::shortcut_row(fl!("nav-timer"), &["Alt", "4"]));
         col = col.push(Self::shortcut_row(fl!("nav-pomodoro"), &["Alt", "5"]));
+        col = col.push(Self::shortcut_row(fl!("nav-chess"), &["Alt", "6"]));
+        col = col.push(Self::shortcut_row(fl!("nav-workout"), &["Alt", "7"]));
+        col = col.push(Self::shortcut_row(fl!("nav-countdown"), &["Alt", "8"]));
 
         col = col.push(widget::divider::horizontal::default());
 
