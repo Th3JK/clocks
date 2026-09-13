@@ -191,11 +191,13 @@ shortcuts-next-tab = Następna karta
 shortcuts-prev-tab = Poprzednia karta
 shortcuts-tabs = Karty
 shortcuts-show-shortcuts = Pokaż skróty
+shortcuts-quick-action = Szybka akcja
 shortcuts-start-pause = Start / Pauza
 shortcuts-lap = Okrążenie (Stoper)
 shortcuts-reset = Resetuj
 shortcuts-new-item = Nowy element
 shortcuts-skip-break = Pomiń przerwę (Pomodoro)
+shortcuts-chess-switch = Przełącz zegar (Szachy)
 
 # Settings — world clocks section
 settings-section-world-clocks = Zegary światowe
@@ -247,6 +249,13 @@ chess-white = Białe
 chess-black = Czarne
 chess-turn = Ruch: { $player }
 chess-paused = Wstrzymano
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Ruch: { $player } — naciśnij zegar lub spację
+chess-moves = { $moves } ruchów
+chess-moves-last = { $moves } ruchów · ostatni { $seconds } s
+chess-lost-on-time = Przegrał na czas
+chess-won = Wygrywa na czas
 chess-flagged = { $player } przekroczył czas
 chess-winner = { $player } wygrywa na czas
 chess-presets = Ustawienia wstępne

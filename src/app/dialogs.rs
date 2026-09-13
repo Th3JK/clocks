@@ -147,6 +147,10 @@ impl AppModel {
             fl!("shortcuts-skip-break"),
             &["Ctrl", "S"],
         ));
+        col = col.push(Self::shortcut_row(
+            fl!("shortcuts-chess-switch"),
+            &["Space"],
+        ));
 
         let dialog = widget::dialog()
             .title(fl!("shortcuts"))

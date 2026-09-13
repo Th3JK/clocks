@@ -191,11 +191,13 @@ shortcuts-next-tab = Next tab
 shortcuts-prev-tab = Previous tab
 shortcuts-tabs = Tabs
 shortcuts-show-shortcuts = Show shortcuts
+shortcuts-quick-action = Quick action
 shortcuts-start-pause = Start / Pause
 shortcuts-lap = Lap (Stopwatch)
 shortcuts-reset = Reset
 shortcuts-new-item = New item
 shortcuts-skip-break = Skip break (Pomodoro)
+shortcuts-chess-switch = Switch clock (Chess)
 
 # Settings — world clocks section
 settings-section-world-clocks = World Clocks
@@ -247,6 +249,13 @@ chess-white = White
 chess-black = Black
 chess-turn = { $player } to move
 chess-paused = Paused
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = { $player } to move — press a clock or Space to start
+chess-moves = { $moves } moves
+chess-moves-last = { $moves } moves · last { $seconds }s
+chess-lost-on-time = Lost on time
+chess-won = Wins on time
 chess-flagged = { $player } ran out of time
 chess-winner = { $player } wins on time
 chess-presets = Presets

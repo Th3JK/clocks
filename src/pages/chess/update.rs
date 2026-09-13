@@ -18,8 +18,14 @@ impl ChessState {
                 // game isn't over.
                 if self.flagged.is_none() && self.current_turn == player {
                     if self.running {
+                        // Capture how long the move took before `commit_active_clock`
+                        // consumes `start_instant`. Only counted when the clock was
+                        // actually running, so the initial tap isn't a "move".
+                        let elapsed =
+                            self.start_instant.map(|s| s.elapsed()).unwrap_or_default();
                         self.commit_active_clock();
                         self.add_increment(player);
+                        self.record_move(player, elapsed);
                     }
                     self.current_turn = player.opponent();
                     self.running = true;

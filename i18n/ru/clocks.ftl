@@ -191,11 +191,13 @@ shortcuts-next-tab = Следующая вкладка
 shortcuts-prev-tab = Предыдущая вкладка
 shortcuts-tabs = Вкладки
 shortcuts-show-shortcuts = Показать горячие клавиши
+shortcuts-quick-action = Быстрое действие
 shortcuts-start-pause = Старт / Пауза
 shortcuts-lap = Круг (Секундомер)
 shortcuts-reset = Сброс
 shortcuts-new-item = Новый элемент
 shortcuts-skip-break = Пропустить перерыв (Помодоро)
+shortcuts-chess-switch = Переключить часы (Шахматы)
 
 # Settings — world clocks section
 settings-section-world-clocks = Мировые часы
@@ -247,6 +249,13 @@ chess-white = Белые
 chess-black = Чёрные
 chess-turn = Ход: { $player }
 chess-paused = Пауза
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Ход { $player } — нажмите часы или пробел
+chess-moves = Ходов: { $moves }
+chess-moves-last = Ходов: { $moves } · последний { $seconds } с
+chess-lost-on-time = Просрочка времени
+chess-won = Победа по времени
 chess-flagged = У игрока { $player } закончилось время
 chess-winner = { $player } выигрывает по времени
 chess-presets = Пресеты

@@ -232,6 +232,13 @@ impl AppModel {
                     self.save_state();
                 }
             }
+            Some(Page::Chess) => {
+                // Space acts as the clock tap: starts the game if idle, otherwise
+                // commits the running clock and hands over to the opponent.
+                let player = self.chess.current_turn;
+                self.chess.update(chess::Message::TapPlayer(player));
+                self.save_state();
+            }
             _ => {}
         }
         Task::none()
@@ -274,6 +281,10 @@ impl AppModel {
                         self.save_state();
                     }
                 }
+            }
+            Some(Page::Chess) => {
+                self.chess.update(chess::Message::Reset);
+                self.save_state();
             }
             _ => {}
         }

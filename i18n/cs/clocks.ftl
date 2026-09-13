@@ -191,11 +191,13 @@ shortcuts-next-tab = Další karta
 shortcuts-prev-tab = Předchozí karta
 shortcuts-tabs = Karty
 shortcuts-show-shortcuts = Zobrazit zkratky
+shortcuts-quick-action = Rychlá akce
 shortcuts-start-pause = Spustit / Pozastavit
 shortcuts-lap = Kolo (Stopky)
 shortcuts-reset = Resetovat
 shortcuts-new-item = Nová položka
 shortcuts-skip-break = Přeskočit pauzu (Pomodoro)
+shortcuts-chess-switch = Přepnout hodiny (Šachy)
 
 # Settings — world clocks section
 settings-section-world-clocks = Světové hodiny
@@ -247,6 +249,13 @@ chess-white = Bílý
 chess-black = Černý
 chess-turn = Na tahu: { $player }
 chess-paused = Pozastaveno
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Na tahu { $player } — stiskni hodiny nebo mezerník
+chess-moves = { $moves } tahů
+chess-moves-last = { $moves } tahů · poslední { $seconds } s
+chess-lost-on-time = Prohrál na čas
+chess-won = Vítězí na čas
 chess-flagged = { $player } vyčerpal čas
 chess-winner = { $player } vyhrává na čas
 chess-presets = Předvolby
