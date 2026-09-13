@@ -27,7 +27,13 @@ path = "src/bin/clocks-daemon.rs"
 # Reached directly rather than through `cosmic::cosmic_config`, so the config
 # schema does not depend on libcosmic's widget layer. Must stay on the same rev
 # as libcosmic below, or the two resolve to different `Config` types.
-cosmic-config = { git = "https://github.com/pop-os/libcosmic.git", rev = "7e82198ab1aba712640b0167e58ad37bf03012ca" }
+#
+# Deliberately one commit behind master. The next commit, "chore: update iced",
+# moves the iced submodule to one whose cctk pin is c0cff4d while libcosmic's
+# own stays 32283d7 -- two revisions of cosmic-client-toolkit in one build,
+# which Flatpak cannot vendor offline because the generated cargo config maps
+# one replacement per repository URL. Here both agree on 32283d7.
+cosmic-config = { git = "https://github.com/pop-os/libcosmic.git", rev = "53314201b08b7ff3758b5d1222c4d214abfb5dd8" }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
 futures-util = "0.3.31"
@@ -56,7 +62,7 @@ zbus = "5"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
-rev = "7e82198ab1aba712640b0167e58ad37bf03012ca"
+rev = "53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 # See https://github.com/pop-os/libcosmic/blob/master/Cargo.toml for available features.
 features = [
     # Accessibility support

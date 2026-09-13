@@ -609,7 +609,7 @@ dependencies = [
 [[package]]
 name = "build_helpers"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "cfg_aliases",
 ]
@@ -974,20 +974,7 @@ version = "0.2.0"
 source = "git+https://github.com/pop-os/cosmic-protocols?rev=32283d7#32283d76a8d0342da74c4cc022a533c52dcf378f"
 dependencies = [
  "bitflags 2.13.2",
- "cosmic-protocols 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=32283d7)",
- "libc",
- "smithay-client-toolkit",
- "wayland-client",
- "wayland-protocols",
-]
-
-[[package]]
-name = "cosmic-client-toolkit"
-version = "0.2.0"
-source = "git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d#c0cff4db14c37ed954983158e4055aa94c7741d9"
-dependencies = [
- "bitflags 2.13.2",
- "cosmic-protocols 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-protocols",
  "libc",
  "smithay-client-toolkit",
  "wayland-client",
@@ -997,7 +984,7 @@ dependencies = [
 [[package]]
 name = "cosmic-config"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "atomicwrites",
  "cosmic-config-derive",
@@ -1018,7 +1005,7 @@ dependencies = [
 [[package]]
 name = "cosmic-config-derive"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -1042,20 +1029,6 @@ dependencies = [
 name = "cosmic-protocols"
 version = "0.2.0"
 source = "git+https://github.com/pop-os/cosmic-protocols?rev=32283d7#32283d76a8d0342da74c4cc022a533c52dcf378f"
-dependencies = [
- "bitflags 2.13.2",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols",
- "wayland-protocols-wlr",
- "wayland-scanner",
- "wayland-server",
-]
-
-[[package]]
-name = "cosmic-protocols"
-version = "0.2.0"
-source = "git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d#c0cff4db14c37ed954983158e4055aa94c7741d9"
 dependencies = [
  "bitflags 2.13.2",
  "wayland-backend",
@@ -1101,7 +1074,7 @@ dependencies = [
 [[package]]
 name = "cosmic-theme"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "almost",
  "configparser",
@@ -2230,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "build_helpers",
  "dnd",
@@ -2252,7 +2225,7 @@ dependencies = [
 [[package]]
 name = "iced_accessibility"
 version = "0.1.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -2261,12 +2234,12 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "bitflags 2.13.2",
  "build_helpers",
  "bytes",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-client-toolkit",
  "dnd",
  "glam",
  "iced_accessibility",
@@ -2288,7 +2261,7 @@ dependencies = [
 [[package]]
 name = "iced_debug"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -2298,7 +2271,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "futures",
  "iced_core",
@@ -2312,7 +2285,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
@@ -2333,7 +2306,7 @@ dependencies = [
 [[package]]
 name = "iced_program"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "iced_graphics",
  "iced_runtime",
@@ -2342,7 +2315,7 @@ dependencies = [
 [[package]]
 name = "iced_renderer"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "iced_graphics",
  "iced_tiny_skia",
@@ -2354,11 +2327,11 @@ dependencies = [
 [[package]]
 name = "iced_runtime"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "build_helpers",
  "bytes",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-client-toolkit",
  "dnd",
  "iced_accessibility",
  "iced_core",
@@ -2371,7 +2344,7 @@ dependencies = [
 [[package]]
 name = "iced_tiny_skia"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -2388,13 +2361,13 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "as-raw-xcb-connection",
  "bitflags 2.13.2",
  "build_helpers",
  "bytemuck",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-client-toolkit",
  "cryoglyph",
  "futures",
  "glam",
@@ -2420,10 +2393,10 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.14.2"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "build_helpers",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-client-toolkit",
  "dnd",
  "iced_accessibility",
  "iced_renderer",
@@ -2440,10 +2413,10 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "build_helpers",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=c0cff4d)",
+ "cosmic-client-toolkit",
  "cursor-icon",
  "dnd",
  "iced_accessibility",
@@ -2936,13 +2909,13 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 [[package]]
 name = "libcosmic"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?rev=7e82198ab1aba712640b0167e58ad37bf03012ca#7e82198ab1aba712640b0167e58ad37bf03012ca"
+source = "git+https://github.com/pop-os/libcosmic.git?rev=53314201b08b7ff3758b5d1222c4d214abfb5dd8#53314201b08b7ff3758b5d1222c4d214abfb5dd8"
 dependencies = [
  "apply",
  "ashpd 0.12.3",
  "auto_enums",
  "build_helpers",
- "cosmic-client-toolkit 0.2.0 (git+https://github.com/pop-os/cosmic-protocols?rev=32283d7)",
+ "cosmic-client-toolkit",
  "cosmic-config",
  "cosmic-freedesktop-icons",
  "cosmic-settings-daemon",
