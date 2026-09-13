@@ -4,10 +4,11 @@
 // and restoring page states from a saved `Config`.
 
 use crate::config::{
-    Config, PomodoroDayStat, PomodoroDefaults, SavedAlarm, SavedChessConfig, SavedClock, SavedLap,
-    SavedPomodoro, SavedRepeatMode, SavedStopwatchRecord, SavedTimer, SavedWorkout,
+    Config, PomodoroDayStat, PomodoroDefaults, SavedAlarm, SavedBlock, SavedChessConfig,
+    SavedClock, SavedCountdownEvent, SavedLap, SavedPomodoro, SavedRepeatMode, SavedStep,
+    SavedStepKind, SavedStopwatchRecord, SavedTimer, SavedWorkout,
 };
-use crate::pages::{alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
+use crate::pages::{alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks};
 use std::time::Duration;
 
 // --- Persistence: build Config from runtime state ---
@@ -184,11 +185,83 @@ pub(super) fn build_config_from_state(
         pomodoro_stats,
         chess,
         workouts,
+        countdown_events,
     }
 }
 
 pub(super) fn restore_chess(config: &Config) -> chess::ChessState {
     chess::ChessState::new(config.chess.base_minutes, config.chess.increment_secs)
+}
+
+pub(super) fn restore_countdowns(config: &Config) -> countdown::CountdownState {
+    let mut state = countdown::CountdownState::default();
+    for (i, e) in config.countdown_events.iter().enumerate() {
+        let mut event =
+            countdown::CountdownEvent::new((i + 1) as u32, e.label.clone(), e.target);
+        event.yearly = e.yearly;
+        event.sound = e.sound.clone();
+        // Unknown reminder names are dropped rather than failing the load, so
+        // the preset list can change without invalidating saved events.
+        event.reminders = e
+            .reminders
+            .iter()
+            .filter_map(|k| countdown::Reminder::from_key(k))
+            .collect();
+        event.fired = e
+            .fired
+            .iter()
+            .filter_map(|k| countdown::Reminder::from_key(k))
+            .collect();
+        event.arrived = e.arrived;
+        state.events.push(event);
+    }
+    // From the highest id in use: positional ids collide after deletions.
+    state.next_id = state.events.iter().map(|e| e.id).max().unwrap_or(0) + 1;
+    state
+}
+
+fn save_step_kind(kind: workout::StepKind) -> SavedStepKind {
+    match kind {
+        workout::StepKind::Prep => SavedStepKind::Prep,
+        workout::StepKind::Effort => SavedStepKind::Effort,
+        workout::StepKind::Recovery => SavedStepKind::Recovery,
+    }
+}
+
+fn load_step_kind(kind: SavedStepKind) -> workout::StepKind {
+    match kind {
+        SavedStepKind::Prep => workout::StepKind::Prep,
+        SavedStepKind::Effort => workout::StepKind::Effort,
+        SavedStepKind::Recovery => workout::StepKind::Recovery,
+    }
+}
+
+fn save_block(block: &workout::Block) -> SavedBlock {
+    SavedBlock {
+        repeat: block.repeat,
+        skip_last_recovery: block.skip_last_recovery,
+        steps: block
+            .steps
+            .iter()
+            .map(|s| SavedStep {
+                label: s.label.clone(),
+                secs: s.secs,
+                kind: save_step_kind(s.kind),
+            })
+            .collect(),
+    }
+}
+
+fn load_block(block: &SavedBlock) -> workout::Block {
+    workout::Block::new(
+        block.repeat,
+        block
+            .steps
+            .iter()
+            .map(|s| workout::Step::new(s.label.clone(), s.secs, load_step_kind(s.kind)))
+            .collect(),
+        block.skip_last_recovery,
+    )
 }
 
 pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {

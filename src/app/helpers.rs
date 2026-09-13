@@ -7,7 +7,9 @@ use super::persistence::build_config_from_state;
 use super::{AppModel, Message};
 use crate::audio;
 use crate::fl;
-use crate::pages::{Page, alarm, chess, pomodoro, stopwatch, timer, workout};
+use crate::pages::{
+    Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
+};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use chrono::{Datelike, Local, NaiveTime, Offset, TimeZone, Timelike, Utc};
 use cosmic::prelude::*;
@@ -55,6 +57,17 @@ impl AppModel {
             let notifications = self.workout.update(workout::Message::Tick);
             for (msg, sound) in notifications {
                 audio::send_notification(&fl!("notification-workout"), &msg);
+                audio::play_sound(&sound);
+            }
+        }
+
+        // Countdown reminders and arrivals. The page rate-limits itself to one
+        // check per wall-clock second; the guard just skips it entirely when
+        // nothing is outstanding.
+        if self.countdown.has_pending() {
+            let notifications = self.countdown.update(countdown::Message::Tick);
+            for (msg, sound) in notifications {
+                audio::send_notification(&fl!("notification-countdown"), &msg);
                 audio::play_sound(&sound);
             }
         }
@@ -293,6 +306,13 @@ impl AppModel {
 
     pub(super) fn handle_page_shortcut_ctrl_n(&mut self) -> Task<cosmic::Action<Message>> {
         match self.nav.active_data::<Page>() {
+            Some(Page::Countdown) => {
+                self.countdown.update(countdown::Message::OpenSettings);
+                self.context_page = crate::pages::ContextPage::CountdownEdit;
+                self.core.window.show_context = true;
+                self.save_state();
+                return widget::text_input::focus(widget::Id::new("countdown-label-input"));
+            }
             Some(Page::WorldClocks) => {
                 self.context_page = crate::pages::ContextPage::WorldClocksAdd;
                 self.core.window.show_context = true;

@@ -3,7 +3,7 @@
 // Implements the `cosmic::Application` trait for `AppModel`.
 
 use super::persistence::{
-    restore_alarms, restore_chess, restore_pomodoros, restore_stopwatch_history, restore_timers,
+    restore_alarms, restore_chess, restore_countdowns, restore_pomodoros, restore_stopwatch_history, restore_timers,
     restore_workouts, restore_world_clocks,
 };
 use super::subscriptions::{
@@ -16,7 +16,9 @@ use super::{
 use cosmic::widget::toaster;
 use crate::config::Config;
 use crate::fl;
-use crate::pages::{ContextPage, Page, alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
+use crate::pages::{
+    ContextPage, Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
+};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::Length;
@@ -85,12 +87,27 @@ impl cosmic::Application for AppModel {
             .data::<Page>(Page::Workout)
             .icon(icon::from_name("emblem-favorite-symbolic"));
 
+        nav.insert()
+            .text(fl!("nav-countdown"))
+            .data::<Page>(Page::Countdown)
+            .icon(icon::icon(super::bundled_icon(super::COUNTDOWN_ICON)));
+
         let about = About::default()
             .name(fl!("app-title"))
             .icon(widget::icon::from_svg_bytes(APP_ICON))
             .version(env!("CARGO_PKG_VERSION"))
-            .links([(fl!("repository"), REPOSITORY)])
-            .license(env!("CARGO_PKG_LICENSE"));
+            // `links` replaces rather than appends, so both entries go in one
+            // call. The tuple is (label, url) — the contributor setters are not
+            // an option here, as they rewrite their second element as `mailto:`.
+            .links([
+                (fl!("repository"), REPOSITORY.to_string()),
+                (fl!("report-issue"), format!("{REPOSITORY}/issues")),
+            ])
+            .license(env!("CARGO_PKG_LICENSE"))
+            // Without a URL the about widget still wires `on_press`, so the
+            // license row was clickable and fired `LaunchUrl("")`.
+            .license_url(format!("{REPOSITORY}/blob/main/LICENSE"))
+            .comments(env!("CARGO_PKG_DESCRIPTION"));
 
         let config_context = cosmic_config::Config::new(Self::APP_ID, Config::VERSION).ok();
         let config = config_context
@@ -147,6 +164,7 @@ impl cosmic::Application for AppModel {
             pomodoro,
             chess,
             workout,
+            countdown,
             active_timer_id: None,
             active_pomodoro_id: None,
             alarm_audio_stops: HashMap::new(),
@@ -263,6 +281,18 @@ impl cosmic::Application for AppModel {
                 )
                 .title(title)
             }
+            ContextPage::CountdownEdit => {
+                let title = if self.countdown.editing_id.is_some() {
+                    fl!("countdown-edit")
+                } else {
+                    fl!("countdown-new")
+                };
+                context_drawer::context_drawer(
+                    self.countdown.settings_view(self.use_12h).map(Message::Countdown),
+                    Message::ToggleContextPage(ContextPage::CountdownEdit),
+                )
+                .title(title)
+            }
             ContextPage::Settings => context_drawer::context_drawer(
                 self.settings_view(),
                 Message::ToggleContextPage(ContextPage::Settings),
@@ -283,6 +313,7 @@ impl cosmic::Application for AppModel {
             Some(Page::Pomodoro) => self.pomodoro.view().map(Message::Pomodoro),
             Some(Page::Chess) => self.chess.view().map(Message::Chess),
             Some(Page::Workout) => self.workout.view().map(Message::Workout),
+            Some(Page::Countdown) => self.countdown.view(self.use_12h).map(Message::Countdown),
             None => widget::text::body(fl!("select-a-view")).into(),
         };
 
@@ -662,6 +693,31 @@ impl cosmic::Application for AppModel {
                 }
             },
 
+            Message::Countdown(ref msg) => match msg {
+                countdown::Message::OpenSettings | countdown::Message::StartEditEvent(_) => {
+                    self.countdown.update(msg.clone());
+                    self.context_page = ContextPage::CountdownEdit;
+                    self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("countdown-label-input"));
+                }
+                countdown::Message::CancelEdit
+                | countdown::Message::SaveEditEvent
+                | countdown::Message::AddEvent => {
+                    self.countdown.update(msg.clone());
+                    self.core.window.show_context = false;
+                }
+                countdown::Message::BrowseCustomSound => {
+                    return open_sound_file_dialog(CustomSoundTarget::Countdown);
+                }
+                countdown::Message::Tick => {
+                    // Handled in handle_tick
+                }
+                _ => {
+                    self.countdown.update(msg.clone());
+                }
+            },
+
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
                     self.core.window.show_context = !self.core.window.show_context;
@@ -698,10 +754,14 @@ impl cosmic::Application for AppModel {
                 CustomSoundTarget::Workout => {
                     self.workout.update(workout::Message::EditSound(path));
                 }
+                CustomSoundTarget::Countdown => {
+                    self.countdown.update(countdown::Message::EditSound(path));
+                }
             },
 
-            Message::SetTimeFormat(use_12h) => {
-                self.use_12h = use_12h;
+            Message::SetTimeFormat(format) => {
+                self.time_format = format;
+                self.use_12h = format.use_12h();
             }
 
             Message::Quit => {

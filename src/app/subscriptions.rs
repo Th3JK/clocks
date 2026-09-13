@@ -59,12 +59,18 @@ pub(super) fn input_subscription(
         // Ctrl+PageUp → Previous tab
         Key::Named(Named::PageUp) if ctrl && !alt && !shift => Some(Message::NavigatePrev),
 
-        // Alt+1..5 → Direct tab navigation
+        // Alt+1..8 → Direct tab navigation
         Key::Character("1") if alt && !ctrl && !shift => Some(Message::NavigateTo(0)),
         Key::Character("2") if alt && !ctrl && !shift => Some(Message::NavigateTo(1)),
         Key::Character("3") if alt && !ctrl && !shift => Some(Message::NavigateTo(2)),
         Key::Character("4") if alt && !ctrl && !shift => Some(Message::NavigateTo(3)),
         Key::Character("5") if alt && !ctrl && !shift => Some(Message::NavigateTo(4)),
+        Key::Character("6") if alt && !ctrl && !shift => Some(Message::NavigateTo(5)),
+        Key::Character("7") if alt && !ctrl && !shift => Some(Message::NavigateTo(6)),
+        Key::Character("8") if alt && !ctrl && !shift => Some(Message::NavigateTo(7)),
+
+        // Ctrl+K → Quick-action palette
+        Key::Character("k") if ctrl && !alt && !shift => Some(Message::OpenPalette),
 
         // Ctrl+N → New item (page-scoped)
         Key::Character("n") if ctrl && !alt && !shift => Some(Message::PageShortcutCtrlN),

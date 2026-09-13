@@ -2,6 +2,7 @@
 
 pub mod alarm;
 pub mod chess;
+pub mod countdown;
 pub mod pomodoro;
 pub mod stopwatch;
 pub mod timer;
@@ -18,6 +19,7 @@ pub enum Page {
     Pomodoro,
     Chess,
     Workout,
+    Countdown,
 }
 
 /// Context drawer pages
@@ -33,4 +35,5 @@ pub enum ContextPage {
     PomodoroSettings,
     ChessSettings,
     WorkoutEdit,
+    CountdownEdit,
 }

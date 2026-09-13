@@ -51,6 +51,9 @@ pub struct Config {
     /// Saved workout (HIIT/Tabata) presets
     #[serde(default)]
     pub workouts: Vec<SavedWorkout>,
+    /// Saved countdown events
+    #[serde(default)]
+    pub countdown_events: Vec<SavedCountdownEvent>,
 }
 
 fn default_true() -> bool {
@@ -78,8 +81,24 @@ impl Default for Config {
             pomodoro_stats: Vec::new(),
             chess: SavedChessConfig::default(),
             workouts: Vec::new(),
+            countdown_events: Vec::new(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedCountdownEvent {
+    pub label: String,
+    pub target: chrono::DateTime<chrono::Local>,
+    pub yearly: bool,
+    pub sound: String,
+    /// Reminder offsets, stored by name so the set can grow without breaking
+    /// existing configs — unknown names are dropped on load.
+    pub reminders: Vec<String>,
+    #[serde(default)]
+    pub fired: Vec<String>,
+    #[serde(default)]
+    pub arrived: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
