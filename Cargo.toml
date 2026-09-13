@@ -20,12 +20,19 @@ i18n-embed-fl = "0.10"
 open = "5.3.2"
 rust-embed = "8.8.0"
 serde = { version = "1.0", features = ["derive"] }
-rodio = { version = "0.20", default-features = false, features = ["wav", "vorbis", "mp3"] }
-sunrise = "1"
+rodio = { version = "0.22", default-features = false, features = ["playback", "wav", "vorbis", "mp3"] }
+sunrise = "3"
+# Only for libcosmic's calendar widget, which speaks jiff rather than chrono.
+# Already in the lockfile via libcosmic, so this pins the same build.
+jiff = "0.2"
+# Locale fallback for the "System" time format (nl_langinfo). Already in the
+# lockfile transitively.
+libc = "0.2"
 tokio = { version = "1.48.0", features = ["full"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
+rev = "c52ef976500c270b1f9b5fe488dbe5e153022ad3"
 # See https://github.com/pop-os/libcosmic/blob/master/Cargo.toml for available features.
 features = [
     # Accessibility support

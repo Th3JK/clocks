@@ -54,14 +54,14 @@ pub fn play_sound(sound: &str) {
 }
 
 fn play_sound_file(path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use rodio::{Decoder, OutputStream, Source};
+    use rodio::{Decoder, DeviceSinkBuilder, Source};
 
     let file = std::fs::File::open(path)?;
-    let buf = std::io::BufReader::new(file);
-    let (_stream, stream_handle) = OutputStream::try_default()?;
-    let source = Decoder::new(buf)?;
+    let mut sink = DeviceSinkBuilder::open_default_sink()?;
+    sink.log_on_drop(false);
+    let source = Decoder::try_from(file)?;
     let duration = source.total_duration().unwrap_or(Duration::from_secs(5));
-    stream_handle.play_raw(source.convert_samples())?;
+    sink.mixer().add(source);
     std::thread::sleep(duration.min(Duration::from_secs(10)));
     Ok(())
 }
@@ -73,20 +73,20 @@ pub fn play_alarm_sound_loop(
     ring_secs: u64,
     stop: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use rodio::{Decoder, OutputStream, Sink, Source};
+    use rodio::{Decoder, DeviceSinkBuilder, Player, Source};
 
     let Some(path) = resolve_sound_path(sound) else {
         return Err("Sound file not found".into());
     };
 
-    let (_stream, stream_handle) = OutputStream::try_default()?;
-    let sink = Sink::try_new(&stream_handle)?;
+    let mut sink = DeviceSinkBuilder::open_default_sink()?;
+    sink.log_on_drop(false);
+    let player = Player::connect_new(sink.mixer());
 
     // Load and loop the source
     let file = std::fs::File::open(&path)?;
-    let buf = std::io::BufReader::new(file);
-    let source = Decoder::new(buf)?.repeat_infinite();
-    sink.append(source);
+    let source = Decoder::try_from(file)?.repeat_infinite();
+    player.append(source);
 
     let start = std::time::Instant::now();
     let ring_duration = Duration::from_secs(ring_secs);
@@ -94,13 +94,13 @@ pub fn play_alarm_sound_loop(
 
     loop {
         if stop.load(Ordering::Relaxed) {
-            sink.stop();
+            player.stop();
             return Ok(());
         }
 
         let elapsed = start.elapsed();
         if elapsed >= ring_duration {
-            sink.stop();
+            player.stop();
             return Ok(());
         }
 
@@ -108,7 +108,7 @@ pub fn play_alarm_sound_loop(
         if elapsed >= fade_start {
             let fade_remaining = ring_duration.saturating_sub(elapsed);
             let volume = fade_remaining.as_secs_f32() / 3.0;
-            sink.set_volume(volume.clamp(0.0, 1.0));
+            player.set_volume(volume.clamp(0.0, 1.0));
         }
 
         std::thread::sleep(Duration::from_millis(100));

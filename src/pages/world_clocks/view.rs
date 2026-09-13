@@ -41,9 +41,14 @@ impl WorldClocksState {
             if let Some(coord) = Coordinates::new(lat, lon) {
                 if let Some(nd) = NaiveDate::from_ymd_opt(date.year(), date.month(), date.day()) {
                     let solar = SolarDay::new(coord, nd);
-                    let sunrise = solar.event_time(SolarEvent::Sunrise);
-                    let sunset = solar.event_time(SolarEvent::Sunset);
-                    return now_utc >= sunrise && now_utc < sunset;
+                    // `event_time` returns `None` on polar days, where the event never
+                    // happens; fall through to the hour-based check in that case.
+                    if let (Some(sunrise), Some(sunset)) = (
+                        solar.event_time(SolarEvent::Sunrise),
+                        solar.event_time(SolarEvent::Sunset),
+                    ) {
+                        return now_utc >= sunrise && now_utc < sunset;
+                    }
                 }
             }
         }
@@ -544,8 +549,14 @@ impl WorldClocksState {
                             let sr = solar.event_time(SolarEvent::Sunrise);
                             let ss = solar.event_time(SolarEvent::Sunset);
                             (
-                                Self::format_sun_dt(sr, clock.timezone, use_12h),
-                                Self::format_sun_dt(ss, clock.timezone, use_12h),
+                                sr.map_or_else(
+                                    || fl!("world-clocks-no-sun-data"),
+                                    |dt| Self::format_sun_dt(dt, clock.timezone, use_12h),
+                                ),
+                                ss.map_or_else(
+                                    || fl!("world-clocks-no-sun-data"),
+                                    |dt| Self::format_sun_dt(dt, clock.timezone, use_12h),
+                                ),
                             )
                         }
                         None => (
