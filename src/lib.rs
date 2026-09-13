@@ -13,6 +13,7 @@ pub const APP_ID: &str = "dev.th3jk.clocks";
 
 pub mod app;
 pub mod audio;
+pub mod autostart;
 pub mod components;
 pub mod config;
 pub mod flags;

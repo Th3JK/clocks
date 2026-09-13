@@ -214,6 +214,12 @@ shortcuts-skip-break = Přeskočit pauzu (Pomodoro)
 shortcuts-chess-switch = Přepnout hodiny (Šachy)
 
 # Settings — world clocks section
+settings-section-background = Na pozadí
+settings-background-description = Budíky a časovače zvoní i při zavřené aplikaci, pokud se služba na pozadí spouští s vaším sezením
+autostart-enable = Spouštět automaticky
+autostart-already-enabled = Spouští se automaticky s vaším sezením
+autostart-enabled = Hodiny se nyní spustí s vaším sezením
+autostart-denied = Oprávnění nebylo uděleno
 settings-section-sidebar = Postranní panel
 settings-sidebar-description = Přetažením změníte pořadí, přepínačem stránku skryjete
 settings-section-world-clocks = Světové hodiny

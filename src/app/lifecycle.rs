@@ -407,6 +407,8 @@ impl cosmic::Application for AppModel {
                 | Message::NavReorder(..)
                 | Message::NavCancelDrag
                 | Message::ShowSettings
+                | Message::EnableAutostart
+                | Message::AutostartResult(_)
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
                 | Message::OpenPalette
@@ -919,6 +921,28 @@ impl cosmic::Application for AppModel {
                 self.rebuild_nav();
                 return self.update_title();
             }
+            Message::EnableAutostart => {
+                return cosmic::task::future(async move {
+                    // Blocking: the portal round-trip waits on a Response
+                    // signal, so it must not run on the event loop.
+                    let granted = tokio::task::spawn_blocking(|| {
+                        crate::autostart::request(crate::autostart::DAEMON_COMMAND)
+                    })
+                    .await
+                    .map(|r| r.unwrap_or(false))
+                    .unwrap_or(false);
+                    cosmic::Action::App(Message::AutostartResult(granted))
+                });
+            }
+            Message::AutostartResult(granted) => {
+                let text = if granted {
+                    fl!("autostart-enabled")
+                } else {
+                    fl!("autostart-denied")
+                };
+                return self.toasts.push(toaster::Toast::new(text)).map(cosmic::action::app);
+            }
+
             Message::ShowSettings => {
                 self.show_settings = true;
                 // Nothing else should be competing for the window.

@@ -214,6 +214,12 @@ shortcuts-skip-break = Pomiń przerwę (Pomodoro)
 shortcuts-chess-switch = Przełącz zegar (Szachy)
 
 # Settings — world clocks section
+settings-section-background = W tle
+settings-background-description = Alarmy i minutniki dzwonią nawet przy zamkniętej aplikacji, o ile usługa w tle uruchamia się z sesją
+autostart-enable = Uruchamiaj automatycznie
+autostart-already-enabled = Uruchamia się automatycznie z sesją
+autostart-enabled = Zegary będą uruchamiane z sesją
+autostart-denied = Nie udzielono uprawnienia
 settings-section-sidebar = Panel boczny
 settings-sidebar-description = Przeciągnij, aby zmienić kolejność; wyłącz, aby ukryć
 settings-section-world-clocks = Zegary światowe

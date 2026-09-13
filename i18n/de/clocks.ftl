@@ -214,6 +214,12 @@ shortcuts-skip-break = Pause überspringen (Pomodoro)
 shortcuts-chess-switch = Uhr wechseln (Schach)
 
 # Settings — world clocks section
+settings-section-background = Hintergrund
+settings-background-description = Wecker und Timer klingeln auch bei geschlossener App, sofern der Hintergrunddienst mit der Sitzung startet
+autostart-enable = Automatisch starten
+autostart-already-enabled = Startet automatisch mit der Sitzung
+autostart-enabled = Uhren startet jetzt mit der Sitzung
+autostart-denied = Berechtigung wurde nicht erteilt
 settings-section-sidebar = Seitenleiste
 settings-sidebar-description = Zum Umsortieren ziehen, zum Ausblenden ausschalten
 settings-section-world-clocks = Weltuhren

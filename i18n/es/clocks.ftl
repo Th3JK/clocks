@@ -214,6 +214,12 @@ shortcuts-skip-break = Saltar descanso (Pomodoro)
 shortcuts-chess-switch = Cambiar reloj (Ajedrez)
 
 # Settings — world clocks section
+settings-section-background = Segundo plano
+settings-background-description = Las alarmas y temporizadores suenan aunque Relojes esté cerrado, si el servicio en segundo plano se inicia con la sesión
+autostart-enable = Iniciar automáticamente
+autostart-already-enabled = Se inicia automáticamente con la sesión
+autostart-enabled = Relojes se iniciará con la sesión
+autostart-denied = No se concedió el permiso
 settings-section-sidebar = Barra lateral
 settings-sidebar-description = Arrastra para reordenar, desactiva para ocultar
 settings-section-world-clocks = Relojes mundiales

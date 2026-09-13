@@ -70,6 +70,23 @@ impl AppModel {
         col = col.push(row);
 
         col = col.push(widget::divider::horizontal::default());
+        col = col.push(widget::text::title4(fl!("settings-section-background")));
+        col = col.push(widget::text::caption(fl!("settings-background-description")));
+        if crate::autostart::is_enabled() {
+            col = col.push(widget::text::body(fl!("autostart-already-enabled")));
+        } else {
+            // User-initiated: inside a Flatpak this prompts, and a permission
+            // dialog thrown at startup with no context is worse than useless.
+            col = col.push(
+                widget::container(
+                    widget::button::suggested(fl!("autostart-enable"))
+                        .on_press(Message::EnableAutostart),
+                )
+                .width(Length::Fill),
+            );
+        }
+
+        col = col.push(widget::divider::horizontal::default());
         col = col.push(widget::text::title4(fl!("settings-section-sidebar")));
         col = col.push(widget::text::caption(fl!("settings-sidebar-description")));
         col = col.push(self.nav_settings_view());

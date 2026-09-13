@@ -214,6 +214,12 @@ shortcuts-skip-break = Пропустить перерыв (Помодоро)
 shortcuts-chess-switch = Переключить часы (Шахматы)
 
 # Settings — world clocks section
+settings-section-background = В фоне
+settings-background-description = Будильники и таймеры срабатывают даже при закрытом приложении, если фоновая служба запускается вместе с сеансом
+autostart-enable = Запускать автоматически
+autostart-already-enabled = Запускается автоматически вместе с сеансом
+autostart-enabled = Часы будут запускаться вместе с сеансом
+autostart-denied = Разрешение не предоставлено
 settings-section-sidebar = Боковая панель
 settings-sidebar-description = Перетащите для порядка, выключите чтобы скрыть
 settings-section-world-clocks = Мировые часы

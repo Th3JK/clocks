@@ -164,6 +164,10 @@ pub enum Message {
     // Sidebar customisation
     ToggleNavPage(crate::pages::Page, bool),
     ShowSettings,
+    /// Ask the desktop to launch the daemon at login. Inside a Flatpak this
+    /// goes through the Background portal and prompts, hence user-initiated.
+    EnableAutostart,
+    AutostartResult(bool),
     NavStartDrag(usize),
     NavReorder(usize, usize),
     NavFinishDrag,

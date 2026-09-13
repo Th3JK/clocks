@@ -214,6 +214,12 @@ shortcuts-skip-break = Skip break (Pomodoro)
 shortcuts-chess-switch = Switch clock (Chess)
 
 # Settings — world clocks section
+settings-section-background = Background
+settings-background-description = Alarms and timers ring even when Clocks is closed, as long as the background service starts with your session
+autostart-enable = Start automatically
+autostart-already-enabled = Starts automatically with your session
+autostart-enabled = Clocks will now start with your session
+autostart-denied = Permission was not granted
 settings-section-sidebar = Sidebar
 settings-sidebar-description = Drag to reorder pages, or switch one off to hide it
 settings-section-world-clocks = World Clocks
