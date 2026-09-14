@@ -33,6 +33,12 @@ finish-args:
   - --talk-name=org.freedesktop.portal.Desktop
   # cosmic-config watches for changes through the settings daemon.
   - --talk-name=com.system76.CosmicSettingsDaemon
+  # Read-only sight of the host's COSMIC config, which is where the theme lives.
+  # Inside a sandbox cosmic-config deliberately reads the *host* config dir --
+  # via HOST_XDG_CONFIG_HOME, falling back to $HOME/.config -- and without this
+  # it finds nothing and the app renders with default colours instead of the
+  # desktop's theme.
+  - --filesystem=xdg-config/cosmic:ro
   # The GUI's single-instance name, and the daemon's own interface. Without the
   # second the daemon cannot claim its bus name and D-Bus activation fails.
   - --own-name=dev.th3jk.clocks
