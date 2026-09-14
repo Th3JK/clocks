@@ -72,7 +72,7 @@ impl AppModel {
         col = col.push(widget::divider::horizontal::default());
         col = col.push(widget::text::title4(fl!("settings-section-background")));
         col = col.push(widget::text::caption(fl!("settings-background-description")));
-        if crate::autostart::is_enabled() {
+        if self.autostart_enabled {
             col = col.push(widget::text::body(fl!("autostart-already-enabled")));
         } else {
             // User-initiated: inside a Flatpak this prompts, and a permission
