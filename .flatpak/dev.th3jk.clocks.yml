@@ -39,6 +39,20 @@ finish-args:
   # it finds nothing and the app renders with default colours instead of the
   # desktop's theme.
   - --filesystem=xdg-config/cosmic:ro
+  # Autostart, when the Background portal is not available to arrange it.
+  #
+  # The preferred route is org.freedesktop.portal.Background, and the app tries
+  # that first. COSMIC does not implement it -- cosmic.portal declares Access,
+  # FileChooser, RemoteDesktop, Screenshot, Settings and ScreenCast, the GTK
+  # backend behind it in the chain has no Background either, and the frontend
+  # only exports an interface some backend backs. So on this app's own target
+  # desktop the portal call fails as an unknown interface, and without this the
+  # daemon cannot be started at login at all: alarms would stop the moment the
+  # window closed, which is the entire reason the daemon exists.
+  #
+  # Scoped to the autostart directory, not xdg-config, and written only when the
+  # user presses "Start automatically".
+  - --filesystem=xdg-config/autostart:create
   # The GUI's single-instance name, and the daemon's own interface. Without the
   # second the daemon cannot claim its bus name and D-Bus activation fails.
   - --own-name=dev.th3jk.clocks

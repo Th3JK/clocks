@@ -129,6 +129,7 @@ impl cosmic::Application for AppModel {
             nav_order,
             nav_hidden,
             show_settings: false,
+            autostart_enabled: crate::autostart::is_enabled(),
             nav_dragging: None,
             nav_pre_drag: Vec::new(),
             runtime: crate::runtime::RuntimeState::default(),
@@ -942,20 +943,30 @@ impl cosmic::Application for AppModel {
                 return cosmic::task::future(async move {
                     // Blocking: the portal round-trip waits on a Response
                     // signal, so it must not run on the event loop.
-                    let granted = tokio::task::spawn_blocking(|| {
+                    let outcome = tokio::task::spawn_blocking(|| {
                         crate::autostart::request(crate::autostart::DAEMON_COMMAND)
                     })
                     .await
-                    .map(|r| r.unwrap_or(false))
-                    .unwrap_or(false);
-                    cosmic::Action::App(Message::AutostartResult(granted))
+                    .unwrap_or_else(|e| {
+                        crate::autostart::Autostart::Failed(format!("request task failed: {e}"))
+                    });
+                    cosmic::Action::App(Message::AutostartResult(outcome))
                 });
             }
-            Message::AutostartResult(granted) => {
-                let text = if granted {
-                    fl!("autostart-enabled")
-                } else {
-                    fl!("autostart-denied")
+            Message::AutostartResult(outcome) => {
+                // A failure used to be reported as a refusal, which sent people
+                // looking for a permission dialog that was never shown. Say
+                // which of the three actually happened.
+                let text = match outcome {
+                    crate::autostart::Autostart::Enabled => {
+                        self.autostart_enabled = true;
+                        fl!("autostart-enabled")
+                    }
+                    crate::autostart::Autostart::Declined => fl!("autostart-denied"),
+                    crate::autostart::Autostart::Failed(error) => {
+                        eprintln!("clocks: could not enable autostart: {error}");
+                        fl!("autostart-failed", error = error)
+                    }
                 };
                 return self.toasts.push(toaster::Toast::new(text)).map(cosmic::action::app);
             }

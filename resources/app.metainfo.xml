@@ -7,18 +7,33 @@
   <summary>A clocks application for the COSMIC desktop</summary>
   <description>
     <p>
-      Clocks is a multi-feature time management application built for the COSMIC
-      desktop environment. It includes world clocks with timezone tracking, a
-      stopwatch with lap timing, configurable alarms with snooze support,
-      countdown timers with repeat mode, and pomodoro technique timers with
-      session management.
+      Clocks brings every kind of timekeeping into one application built for the
+      COSMIC desktop. A background service owns the schedule, so alarms ring,
+      timers finish and pomodoro sessions advance whether or not a window is
+      open, and their notifications reopen the app on the page you need.
+    </p>
+    <p>It includes:</p>
+    <ul>
+      <li>World clocks, with sunrise and sunset for each city</li>
+      <li>Alarms that repeat, snooze and ring with the app closed</li>
+      <li>A stopwatch with lap timing and saved history</li>
+      <li>Countdown timers that repeat a set number of times</li>
+      <li>Pomodoro sessions with focus mode and daily statistics</li>
+      <li>A countdown to dated events, with reminders beforehand</li>
+      <li>Workout timers built from composable prepare, work and rest blocks</li>
+      <li>A chess clock with configurable time controls and increments</li>
+    </ul>
+    <p>
+      The sidebar can be reordered and pages hidden, so the app shows only the
+      clocks you actually use.
     </p>
   </description>
   <developer id="dev.th3jk">
     <name>th3jk</name>
   </developer>
-  <url type="homepage">https://github.com/th3jk/clocks</url>
-  <url type="vcs-browser">https://github.com/th3jk/clocks</url>
+  <url type="homepage">https://github.com/Th3JK/clocks</url>
+  <url type="vcs-browser">https://github.com/Th3JK/clocks</url>
+  <url type="bugtracker">https://github.com/Th3JK/clocks/issues</url>
   <launchable type="desktop-id">dev.th3jk.clocks.desktop</launchable>
   <provides>
     <binary>clocks</binary>
@@ -43,11 +58,43 @@
     <keyword>stopwatch</keyword>
     <keyword>pomodoro</keyword>
   </keywords>
+  <!--
+    Screenshot URLs are pinned to the release tag rather than a branch, so an
+    older release keeps the listing it shipped with. They only resolve once the
+    tag is pushed.
+  -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Th3JK/clocks/v0.1.0/resources/screenshots/world.png</image>
+      <caption>World clocks across time zones</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Th3JK/clocks/v0.1.0/resources/screenshots/alarm.png</image>
+      <caption>Alarms that ring with the app closed</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Th3JK/clocks/v0.1.0/resources/screenshots/timer.png</image>
+      <caption>Countdown timers with repeat</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Th3JK/clocks/v0.1.0/resources/screenshots/pomodoro.png</image>
+      <caption>Pomodoro sessions and focus statistics</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Th3JK/clocks/v0.1.0/resources/screenshots/chess.png</image>
+      <caption>A chess clock with configurable time controls</caption>
+    </screenshot>
+  </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.0" date="2025-01-01">
+    <release version="0.1.0" date="2026-09-14">
       <description>
-        <p>Initial release with world clocks, stopwatch, alarms, timers, and pomodoro.</p>
+        <p>First release.</p>
+        <ul>
+          <li>Alarms, timers, pomodoro and event countdowns run in a background service and fire with the app closed</li>
+          <li>World clocks, stopwatch, workout timer and chess clock</li>
+          <li>A reorderable, hideable sidebar and a quick-action palette</li>
+        </ul>
       </description>
     </release>
   </releases>

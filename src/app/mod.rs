@@ -85,6 +85,12 @@ pub struct AppModel {
     /// hideable, so putting Settings in it would let someone hide the only route
     /// to it.
     show_settings: bool,
+    /// Whether the daemon is already set to start at login.
+    ///
+    /// Cached rather than re-derived in the view: answering it stats the
+    /// autostart directory, and the settings page would do that on every
+    /// repaint.
+    autostart_enabled: bool,
     /// Drag state for reordering the sidebar. Works because settings is a page
     /// in `view()` -- drag inside a context drawer is silently inert.
     nav_dragging: Option<usize>,
@@ -167,7 +173,7 @@ pub enum Message {
     /// Ask the desktop to launch the daemon at login. Inside a Flatpak this
     /// goes through the Background portal and prompts, hence user-initiated.
     EnableAutostart,
-    AutostartResult(bool),
+    AutostartResult(crate::autostart::Autostart),
     NavStartDrag(usize),
     NavReorder(usize, usize),
     NavFinishDrag,
