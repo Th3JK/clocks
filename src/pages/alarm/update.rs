@@ -34,10 +34,17 @@ impl AlarmState {
             Message::ToggleAlarm(id) => {
                 if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
                     alarm.is_enabled = !alarm.is_enabled;
+                    // Switching an alarm off must also cancel a pending snooze,
+                    // otherwise it re-rings despite reading as disabled.
+                    if !alarm.is_enabled {
+                        self.snoozed.retain(|s| s.alarm_id != id);
+                    }
                 }
             }
             Message::DeleteAlarm(id) => {
                 self.alarms.retain(|a| a.id != id);
+                self.snoozed.retain(|s| s.alarm_id != id);
+                self.ringing.retain(|r| r.alarm_id != id);
             }
             Message::StartNewAlarm => {
                 let (hour, is_pm) = (8, false);
@@ -92,8 +99,17 @@ impl AlarmState {
                             alarm.sound = edit.sound;
                             alarm.snooze_minutes = edit.snooze_minutes;
                             alarm.ring_minutes = edit.ring_minutes;
+                            // Re-arm on save. A `RepeatMode::Once` alarm disables
+                            // itself when it fires, so editing a fired alarm to a
+                            // new time would otherwise save it still switched off.
+                            alarm.is_enabled = true;
                         }
+                        // A pending snooze refers to the old time; saving a new
+                        // time supersedes it.
+                        self.snoozed.retain(|s| s.alarm_id != id);
+                        self.last_saved_id = Some(id);
                     } else {
+                        self.last_saved_id = Some(self.next_id);
                         self.alarms.push(AlarmEntry {
                             id: self.next_id,
                             hour: saved_hour,
@@ -247,8 +263,8 @@ impl AlarmState {
                         sound: ringing.sound,
                         ring_minutes: (ringing.ring_secs / 60).max(1) as u8,
                         snooze_minutes: ringing.snooze_minutes,
-                        retrigger_at: Instant::now()
-                            + std::time::Duration::from_secs(snooze_secs),
+                        retrigger_at: chrono::Local::now()
+                            + chrono::Duration::seconds(snooze_secs as i64),
                     });
                 }
             }
@@ -304,7 +320,7 @@ impl AlarmState {
 
     /// Check snoozed alarms and return any that should re-trigger now
     pub fn check_snoozed(&mut self) -> Vec<AlarmTriggerInfo> {
-        let now = Instant::now();
+        let now = chrono::Local::now();
         let mut retriggers = Vec::new();
         let mut remaining = Vec::new();
 

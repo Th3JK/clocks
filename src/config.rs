@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use chrono_tz::Tz;
-use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
+use cosmic_config::{CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, CosmicConfigEntry, PartialEq, Serialize, Deserialize)]
-#[version = 4]
+#[version = 5]
 pub struct Config {
     /// Saved world clocks (timezone names)
     pub world_clocks: Vec<SavedClock>,
@@ -17,8 +17,8 @@ pub struct Config {
     pub pomodoros: Vec<SavedPomodoro>,
     /// Pomodoro default durations
     pub pomodoro_defaults: PomodoroDefaults,
-    /// Use 12-hour (AM/PM) time format instead of 24-hour
-    pub use_12h: bool,
+    /// 24-hour, 12-hour, or follow the desktop.
+    pub time_format: crate::time_format::TimeFormat,
     /// Confirmation dialog settings (default: true = show confirmation)
     #[serde(default = "default_true")]
     pub confirm_delete_alarm: bool,
@@ -51,6 +51,17 @@ pub struct Config {
     /// Saved workout (HIIT/Tabata) presets
     #[serde(default)]
     pub workouts: Vec<SavedWorkout>,
+    /// Saved countdown events
+    #[serde(default)]
+    pub countdown_events: Vec<SavedCountdownEvent>,
+    /// Sidebar page order, by stable page key. Empty means "never customised",
+    /// which restores the built-in order — and lets a page added in a later
+    /// release appear rather than being treated as hidden.
+    #[serde(default)]
+    pub nav_order: Vec<String>,
+    /// Page keys hidden from the sidebar.
+    #[serde(default)]
+    pub nav_hidden: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -65,7 +76,7 @@ impl Default for Config {
             timers: Vec::new(),
             pomodoros: Vec::new(),
             pomodoro_defaults: PomodoroDefaults::default(),
-            use_12h: false,
+            time_format: crate::time_format::TimeFormat::System,
             confirm_delete_alarm: true,
             confirm_delete_timer: true,
             confirm_delete_world_clock: true,
@@ -78,20 +89,53 @@ impl Default for Config {
             pomodoro_stats: Vec::new(),
             chess: SavedChessConfig::default(),
             workouts: Vec::new(),
+            countdown_events: Vec::new(),
+            nav_order: Vec::new(),
+            nav_hidden: Vec::new(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedCountdownEvent {
+    /// Stable identity. The daemon records delivered reminders against it, so
+    /// positional ids would re-point them on reorder.
+    pub id: u32,
+    pub label: String,
+    pub target: chrono::DateTime<chrono::Local>,
+    pub yearly: bool,
+    pub sound: String,
+    /// Reminder offsets, stored by name so the set can grow without breaking
+    /// existing configs — unknown names are dropped on load.
+    pub reminders: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedWorkout {
     pub label: String,
-    pub prep_secs: u32,
-    pub work_secs: u32,
-    pub rest_secs: u32,
-    pub rounds: u32,
-    pub sets: u32,
-    pub set_rest_secs: u32,
     pub sound: String,
+    pub blocks: Vec<SavedBlock>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedBlock {
+    pub repeat: u32,
+    pub steps: Vec<SavedStep>,
+    pub skip_last_recovery: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedStep {
+    pub label: String,
+    pub secs: u32,
+    pub kind: SavedStepKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum SavedStepKind {
+    Prep,
+    Effort,
+    Recovery,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -118,6 +162,15 @@ pub struct SavedClock {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedAlarm {
+    /// Stable identity, independent of position in the list.
+    ///
+    /// Ids used to be derived from list position on load, so reordering the
+    /// alarms renumbered them -- and a pending snooze, which references its
+    /// alarm by id, would silently reattach to a different one. Auto-sort made
+    /// that happen during an ordinary save. `0` means a config written before
+    /// this field existed; `restore_alarms` assigns those positionally once.
+    #[serde(default)]
+    pub id: u32,
     pub hour: u8,
     pub minute: u8,
     pub label: String,
@@ -137,6 +190,12 @@ pub enum SavedRepeatMode {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedTimer {
+    /// Stable identity, independent of list position. The daemon references a
+    /// running timer by id, so deriving it from position would re-point a live
+    /// run at a different timer the moment the list is reordered.
+    /// `0` means a config written before this field existed.
+    #[serde(default)]
+    pub id: u32,
     pub label: String,
     pub duration_secs: u64,
     pub repeat_enabled: bool,
@@ -146,6 +205,10 @@ pub struct SavedTimer {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedPomodoro {
+    /// Stable identity. The daemon references a running session by id, so
+    /// deriving it from list position would re-point a live run at a different
+    /// pomodoro as soon as the list is reordered.
+    pub id: u32,
     pub label: String,
     pub work_minutes: u32,
     pub short_break_minutes: u32,

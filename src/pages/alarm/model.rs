@@ -134,7 +134,10 @@ pub struct SnoozedAlarm {
     pub sound: String,
     pub ring_minutes: u8,
     pub snooze_minutes: u8,
-    pub retrigger_at: Instant,
+    /// Wall-clock time the alarm re-rings. Deliberately *not* an `Instant`:
+    /// a monotonic clock cannot be serialized, and snoozes have to survive a
+    /// restart.
+    pub retrigger_at: chrono::DateTime<chrono::Local>,
 }
 
 pub struct AlarmState {
@@ -149,6 +152,10 @@ pub struct AlarmState {
     pub dragging_index: Option<usize>,
     /// Snapshot of alarm IDs before drag started, for cancel/revert.
     pub pre_drag_order: Vec<u32>,
+    /// Id of the alarm written by the last `SaveAlarm`, for the post-save toast.
+    /// Session-only; the list position is not a reliable stand-in because
+    /// auto-sort may reorder `alarms` before the toast is built.
+    pub last_saved_id: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +183,7 @@ impl Default for AlarmState {
             edit_mode: false,
             dragging_index: None,
             pre_drag_order: Vec::new(),
+            last_saved_id: None,
         }
     }
 }

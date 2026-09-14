@@ -2,6 +2,7 @@ app-title = Hodiny
 about = O aplikaci
 settings = Nastavení
 repository = Úložiště
+report-issue = Nahlásit problém
 view = Zobrazení
 
 # Navigation
@@ -22,14 +23,16 @@ start = Spustit
 pause = Pozastavit
 resume = Pokračovat
 reset = Resetovat
+notification-open = Otevřít Hodiny
 dismiss = Zavřít
 snooze = Odložit
 add = Přidat
 
 # Settings
 time-format = Formát času
+time-format-system = Systémový
 time-format-24h = 24hodinový
-time-format-12h = 12hodinový (AM/PM)
+time-format-12h = 12hodinový
 
 # Tooltips
 tooltip-add = Přidat
@@ -111,6 +114,7 @@ alarm-ringing = Budík: { $label }
 ringing = Zvoní...
 alarm-label-placeholder = Název budíku
 alarm-default-label = Budík
+alarm-snoozed-until = Odloženo do { $time }
 once = Jednou
 every-day = Každý den
 select-specific-days = Nebo vyberte konkrétní dny:
@@ -180,6 +184,17 @@ pomodoro-transition = { $label }: { $prev } dokončena! Začíná { $next }
 pomodoro-settings = Nastavení Pomodoro
 
 # Shortcuts
+palette-title = Rychlá akce
+palette-placeholder = např. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Zadejte dobu, čas nebo název stránky
+palette-no-match = Nic neodpovídá
+palette-run = Spustit
+palette-preview-timer = Spustit časovač { $duration } { $label }
+palette-preview-alarm = Nastavit budík na { $time } { $label }
+palette-preview-countdown = Přidat odpočet do { $date } { $label }
+palette-preview-clock = Přidat světový čas pro „{ $query }“
+palette-preview-navigate = Přejít na { $page }
+palette-preview-start = Spustit { $label }
 shortcuts = Klávesové zkratky
 shortcuts-description = Klávesové zkratky dostupné v této aplikaci
 shortcuts-close = Zavřít
@@ -190,13 +205,23 @@ shortcuts-next-tab = Další karta
 shortcuts-prev-tab = Předchozí karta
 shortcuts-tabs = Karty
 shortcuts-show-shortcuts = Zobrazit zkratky
+shortcuts-quick-action = Rychlá akce
 shortcuts-start-pause = Spustit / Pozastavit
 shortcuts-lap = Kolo (Stopky)
 shortcuts-reset = Resetovat
 shortcuts-new-item = Nová položka
 shortcuts-skip-break = Přeskočit pauzu (Pomodoro)
+shortcuts-chess-switch = Přepnout hodiny (Šachy)
 
 # Settings — world clocks section
+settings-section-background = Na pozadí
+settings-background-description = Budíky a časovače zvoní i při zavřené aplikaci, pokud se služba na pozadí spouští s vaším sezením
+autostart-enable = Spouštět automaticky
+autostart-already-enabled = Spouští se automaticky s vaším sezením
+autostart-enabled = Hodiny se nyní spustí s vaším sezením
+autostart-denied = Oprávnění nebylo uděleno
+settings-section-sidebar = Postranní panel
+settings-sidebar-description = Přetažením změníte pořadí, přepínačem stránku skryjete
 settings-section-world-clocks = Světové hodiny
 settings-auto-sort-world-clocks = Automaticky řadit podle časového posunu
 
@@ -246,6 +271,13 @@ chess-white = Bílý
 chess-black = Černý
 chess-turn = Na tahu: { $player }
 chess-paused = Pozastaveno
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Na tahu { $player } — stiskni hodiny nebo mezerník
+chess-moves = { $moves } tahů
+chess-moves-last = { $moves } tahů · poslední { $seconds } s
+chess-lost-on-time = Prohrál na čas
+chess-won = Vítězí na čas
 chess-flagged = { $player } vyčerpal čas
 chess-winner = { $player } vyhrává na čas
 chess-presets = Předvolby
@@ -268,8 +300,8 @@ workout-set-rest = PŘESTÁVKA
 workout-done = HOTOVO
 workout-preset-tabata = Tabata
 workout-preset-hiit = HIIT
-workout-status = { $phase } · Kolo { $round }/{ $rounds } · Série { $set }/{ $sets }
-workout-summary = { $work }s práce / { $rest }s odpočinek × { $rounds }
+workout-status-blocks = { $step } · Blok { $block }/{ $blocks } · Kolo { $rep }/{ $reps }
+workout-summary = { $blocks } bloků · { $total }
 workout-default-label = Cvičení { $id }
 workout-complete = { $label } dokončeno
 workout-phase = { $label }: { $phase }
@@ -284,5 +316,48 @@ workout-rounds-label = Kola
 workout-sets-label = Série
 workout-set-rest-label = Přestávka
 workout-add = Přidat cvičení
+workout-total-duration = Celkem { $total }
+workout-skip-last-recovery = Vynechat poslední odpočinek
+workout-repeat = Opakování
+workout-block-n = Blok { $n }
+workout-add-step = Přidat krok
+workout-add-block = Přidat blok
+workout-edit-blocks-title = Úprava: { $label }
+workout-edit-blocks = Upravit bloky…
+workout-kind-recovery = Odpočinek
+workout-kind-effort = Zátěž
+workout-kind-prep = Příprava
 create-workout = Vytvořit cvičení
 notification-workout = Cvičení
+
+# Countdown to events
+nav-countdown = Odpočet
+countdown-title = Odpočet
+countdown-edit = Upravit událost
+countdown-new = Nová událost
+countdown-add = Přidat událost
+countdown-label-placeholder = Název události (např. Start)
+countdown-pick-date = Vyberte datum
+countdown-default-label = Událost { $id }
+create-countdown = Vytvořit událost
+countdown-yearly = Ročně
+countdown-yearly-label = Opakovat každý rok
+countdown-reminders = Upozornit předem
+countdown-reminder-5min = 5 minut předem
+countdown-reminder-15min = 15 minut předem
+countdown-reminder-1hour = 1 hodinu předem
+countdown-reminder-1day = 1 den předem
+countdown-reminder-1week = 1 týden předem
+countdown-reminder-count = Upozornění: { $count }
+countdown-reminder-body = { $label } — { $when }
+countdown-arrived = { $label } nastává
+countdown-dhms = { $days } d { $hours } h { $minutes } m { $seconds } s
+countdown-ago = { $when } (proběhlo)
+countdown-passed = Proběhlo
+countdown-edit = Upravit událost
+countdown-days = { $days ->
+    [one] { $days } den
+    [few] { $days } dny
+   *[other] { $days } dní
+}
+notification-countdown = Odpočet

@@ -2,6 +2,7 @@ app-title = Zegary
 about = O aplikacji
 settings = Ustawienia
 repository = Repozytorium
+report-issue = Zgłoś problem
 view = Widok
 
 # Navigation
@@ -22,14 +23,16 @@ start = Start
 pause = Pauza
 resume = Wznów
 reset = Resetuj
+notification-open = Otwórz Zegary
 dismiss = Odrzuć
 snooze = Drzemka
 add = Dodaj
 
 # Settings
 time-format = Format czasu
+time-format-system = Systemowy
 time-format-24h = 24-godzinny
-time-format-12h = 12-godzinny (AM/PM)
+time-format-12h = 12-godzinny
 
 # Tooltips
 tooltip-add = Dodaj
@@ -111,6 +114,7 @@ alarm-ringing = Budzik: { $label }
 ringing = Dzwoni...
 alarm-label-placeholder = Etykieta budzika
 alarm-default-label = Budzik
+alarm-snoozed-until = Drzemka do { $time }
 once = Raz
 every-day = Każdego dnia
 select-specific-days = Lub wybierz konkretne dni:
@@ -180,6 +184,17 @@ pomodoro-transition = { $label }: { $prev } zakończone! Rozpoczynanie { $next }
 pomodoro-settings = Ustawienia Pomodoro
 
 # Shortcuts
+palette-title = Szybka akcja
+palette-placeholder = np. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Wpisz czas trwania, godzinę lub nazwę strony
+palette-no-match = Brak dopasowania
+palette-run = Uruchom
+palette-preview-timer = Uruchom minutnik { $duration } { $label }
+palette-preview-alarm = Ustaw alarm na { $time } { $label }
+palette-preview-countdown = Dodaj odliczanie do { $date } { $label }
+palette-preview-clock = Dodaj zegar światowy dla „{ $query }”
+palette-preview-navigate = Przejdź do { $page }
+palette-preview-start = Uruchom { $label }
 shortcuts = Skróty klawiszowe
 shortcuts-description = Skróty klawiszowe dostępne w tej aplikacji
 shortcuts-close = Zamknij
@@ -190,13 +205,23 @@ shortcuts-next-tab = Następna karta
 shortcuts-prev-tab = Poprzednia karta
 shortcuts-tabs = Karty
 shortcuts-show-shortcuts = Pokaż skróty
+shortcuts-quick-action = Szybka akcja
 shortcuts-start-pause = Start / Pauza
 shortcuts-lap = Okrążenie (Stoper)
 shortcuts-reset = Resetuj
 shortcuts-new-item = Nowy element
 shortcuts-skip-break = Pomiń przerwę (Pomodoro)
+shortcuts-chess-switch = Przełącz zegar (Szachy)
 
 # Settings — world clocks section
+settings-section-background = W tle
+settings-background-description = Alarmy i minutniki dzwonią nawet przy zamkniętej aplikacji, o ile usługa w tle uruchamia się z sesją
+autostart-enable = Uruchamiaj automatycznie
+autostart-already-enabled = Uruchamia się automatycznie z sesją
+autostart-enabled = Zegary będą uruchamiane z sesją
+autostart-denied = Nie udzielono uprawnienia
+settings-section-sidebar = Panel boczny
+settings-sidebar-description = Przeciągnij, aby zmienić kolejność; wyłącz, aby ukryć
 settings-section-world-clocks = Zegary światowe
 settings-auto-sort-world-clocks = Automatycznie sortuj według przesunięcia strefy czasowej
 
@@ -246,6 +271,13 @@ chess-white = Białe
 chess-black = Czarne
 chess-turn = Ruch: { $player }
 chess-paused = Wstrzymano
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Ruch: { $player } — naciśnij zegar lub spację
+chess-moves = { $moves } ruchów
+chess-moves-last = { $moves } ruchów · ostatni { $seconds } s
+chess-lost-on-time = Przegrał na czas
+chess-won = Wygrywa na czas
 chess-flagged = { $player } przekroczył czas
 chess-winner = { $player } wygrywa na czas
 chess-presets = Ustawienia wstępne
@@ -268,8 +300,8 @@ workout-set-rest = PRZERWA
 workout-done = GOTOWE
 workout-preset-tabata = Tabata
 workout-preset-hiit = HIIT
-workout-status = { $phase } · Runda { $round }/{ $rounds } · Seria { $set }/{ $sets }
-workout-summary = { $work }s pracy / { $rest }s odpoczynku × { $rounds }
+workout-status-blocks = { $step } · Blok { $block }/{ $blocks } · Runda { $rep }/{ $reps }
+workout-summary = { $blocks } bloków · { $total }
 workout-default-label = Trening { $id }
 workout-complete = { $label } ukończony
 workout-phase = { $label }: { $phase }
@@ -284,5 +316,47 @@ workout-rounds-label = Rundy
 workout-sets-label = Serie
 workout-set-rest-label = Przerwa między seriami
 workout-add = Dodaj trening
+workout-total-duration = Razem { $total }
+workout-skip-last-recovery = Pomiń ostatni odpoczynek
+workout-repeat = Powtórzenia
+workout-block-n = Blok { $n }
+workout-add-step = Dodaj krok
+workout-add-block = Dodaj blok
+workout-edit-blocks-title = Edycja: { $label }
+workout-edit-blocks = Edytuj bloki…
+workout-kind-recovery = Odpoczynek
+workout-kind-effort = Wysiłek
+workout-kind-prep = Przygotowanie
 create-workout = Utwórz trening
 notification-workout = Trening
+
+# Countdown to events
+nav-countdown = Odliczanie
+countdown-title = Odliczanie
+countdown-edit = Edytuj wydarzenie
+countdown-new = Nowe wydarzenie
+countdown-add = Dodaj wydarzenie
+countdown-label-placeholder = Nazwa wydarzenia (np. Start)
+countdown-pick-date = Wybierz datę
+countdown-default-label = Wydarzenie { $id }
+create-countdown = Utwórz wydarzenie
+countdown-yearly = Co rok
+countdown-yearly-label = Powtarzaj co roku
+countdown-reminders = Przypomnij wcześniej
+countdown-reminder-5min = 5 minut wcześniej
+countdown-reminder-15min = 15 minut wcześniej
+countdown-reminder-1hour = 1 godzinę wcześniej
+countdown-reminder-1day = 1 dzień wcześniej
+countdown-reminder-1week = 1 tydzień wcześniej
+countdown-reminder-count = Przypomnienia: { $count }
+countdown-reminder-body = { $label } — { $when }
+countdown-arrived = { $label } nadeszło
+countdown-dhms = { $days } d { $hours } h { $minutes } m { $seconds } s
+countdown-ago = { $when } (minęło)
+countdown-passed = Minęło
+countdown-edit = Edytuj wydarzenie
+countdown-days = { $days ->
+    [one] { $days } dzień
+   *[other] { $days } dni
+}
+notification-countdown = Odliczanie

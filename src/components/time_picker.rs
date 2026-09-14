@@ -38,7 +38,22 @@ impl<M> TimeUnit<M> {
 }
 
 /// Build a compact vertical-stepper time picker from the given units.
+///
+/// Centred in the available width. Callers that need to place the stepper beside
+/// something else want [`time_picker_row`], which is this without the wrapper.
 pub fn time_picker<M: Clone + 'static>(units: Vec<TimeUnit<M>>) -> Element<'static, M> {
+    widget::container(time_picker_row(units))
+        .align_x(Alignment::Center)
+        .width(Length::Fill)
+        .into()
+}
+
+/// The stepper row on its own, shrink-wrapped to its contents.
+///
+/// Its children are aligned on the centre line, so a sibling placed in a row
+/// with this one and `Alignment::Center` lines up with the digits rather than
+/// with the increment buttons.
+pub fn time_picker_row<M: Clone + 'static>(units: Vec<TimeUnit<M>>) -> Element<'static, M> {
     let spacing = cosmic::theme::spacing();
 
     let mut row = widget::row::with_capacity(units.len() * 2)
@@ -71,8 +86,5 @@ pub fn time_picker<M: Clone + 'static>(units: Vec<TimeUnit<M>>) -> Element<'stat
         }
     }
 
-    widget::container(row)
-        .align_x(Alignment::Center)
-        .width(Length::Fill)
-        .into()
+    row.into()
 }

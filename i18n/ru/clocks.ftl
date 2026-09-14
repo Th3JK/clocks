@@ -2,6 +2,7 @@ app-title = Часы
 about = О программе
 settings = Настройки
 repository = Репозиторий
+report-issue = Сообщить о проблеме
 view = Вид
 
 # Navigation
@@ -22,14 +23,16 @@ start = Старт
 pause = Пауза
 resume = Продолжить
 reset = Сброс
+notification-open = Открыть Часы
 dismiss = Отключить
 snooze = Отложить
 add = Добавить
 
 # Settings
 time-format = Формат времени
+time-format-system = Системный
 time-format-24h = 24-часовой
-time-format-12h = 12-часовой (AM/PM)
+time-format-12h = 12-часовой
 
 # Tooltips
 tooltip-add = Добавить
@@ -111,6 +114,7 @@ alarm-ringing = Будильник: { $label }
 ringing = Звонит...
 alarm-label-placeholder = Название будильника
 alarm-default-label = Будильник
+alarm-snoozed-until = Отложено до { $time }
 once = Однократно
 every-day = Каждый день
 select-specific-days = Или выберите определённые дни:
@@ -180,6 +184,17 @@ pomodoro-transition = { $label }: { $prev } завершена! Начинает
 pomodoro-settings = Настройки Помодоро
 
 # Shortcuts
+palette-title = Быстрое действие
+palette-placeholder = напр. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Введите длительность, время или название страницы
+palette-no-match = Ничего не найдено
+palette-run = Выполнить
+palette-preview-timer = Запустить таймер на { $duration } { $label }
+palette-preview-alarm = Поставить будильник на { $time } { $label }
+palette-preview-countdown = Добавить отсчёт до { $date } { $label }
+palette-preview-clock = Добавить мировые часы для «{ $query }»
+palette-preview-navigate = Перейти к { $page }
+palette-preview-start = Запустить { $label }
 shortcuts = Горячие клавиши
 shortcuts-description = Горячие клавиши, доступные в этом приложении
 shortcuts-close = Закрыть
@@ -190,13 +205,23 @@ shortcuts-next-tab = Следующая вкладка
 shortcuts-prev-tab = Предыдущая вкладка
 shortcuts-tabs = Вкладки
 shortcuts-show-shortcuts = Показать горячие клавиши
+shortcuts-quick-action = Быстрое действие
 shortcuts-start-pause = Старт / Пауза
 shortcuts-lap = Круг (Секундомер)
 shortcuts-reset = Сброс
 shortcuts-new-item = Новый элемент
 shortcuts-skip-break = Пропустить перерыв (Помодоро)
+shortcuts-chess-switch = Переключить часы (Шахматы)
 
 # Settings — world clocks section
+settings-section-background = В фоне
+settings-background-description = Будильники и таймеры срабатывают даже при закрытом приложении, если фоновая служба запускается вместе с сеансом
+autostart-enable = Запускать автоматически
+autostart-already-enabled = Запускается автоматически вместе с сеансом
+autostart-enabled = Часы будут запускаться вместе с сеансом
+autostart-denied = Разрешение не предоставлено
+settings-section-sidebar = Боковая панель
+settings-sidebar-description = Перетащите для порядка, выключите чтобы скрыть
 settings-section-world-clocks = Мировые часы
 settings-auto-sort-world-clocks = Автоматически сортировать по смещению часового пояса
 
@@ -246,6 +271,13 @@ chess-white = Белые
 chess-black = Чёрные
 chess-turn = Ход: { $player }
 chess-paused = Пауза
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = Ход { $player } — нажмите часы или пробел
+chess-moves = Ходов: { $moves }
+chess-moves-last = Ходов: { $moves } · последний { $seconds } с
+chess-lost-on-time = Просрочка времени
+chess-won = Победа по времени
 chess-flagged = У игрока { $player } закончилось время
 chess-winner = { $player } выигрывает по времени
 chess-presets = Пресеты
@@ -268,8 +300,8 @@ workout-set-rest = ПЕРЕРЫВ
 workout-done = ГОТОВО
 workout-preset-tabata = Табата
 workout-preset-hiit = ВИИТ
-workout-status = { $phase } · Раунд { $round }/{ $rounds } · Сет { $set }/{ $sets }
-workout-summary = { $work }с работы / { $rest }с отдыха × { $rounds }
+workout-status-blocks = { $step } · Блок { $block }/{ $blocks } · Раунд { $rep }/{ $reps }
+workout-summary = { $blocks } блоков · { $total }
 workout-default-label = Тренировка { $id }
 workout-complete = { $label } завершена
 workout-phase = { $label }: { $phase }
@@ -284,5 +316,48 @@ workout-rounds-label = Раунды
 workout-sets-label = Сеты
 workout-set-rest-label = Перерыв между сетами
 workout-add = Добавить тренировку
+workout-total-duration = Всего { $total }
+workout-skip-last-recovery = Пропустить последний отдых
+workout-repeat = Повторы
+workout-block-n = Блок { $n }
+workout-add-step = Добавить шаг
+workout-add-block = Добавить блок
+workout-edit-blocks-title = Правка: { $label }
+workout-edit-blocks = Изменить блоки…
+workout-kind-recovery = Отдых
+workout-kind-effort = Нагрузка
+workout-kind-prep = Подготовка
 create-workout = Создать тренировку
 notification-workout = Тренировка
+
+# Countdown to events
+nav-countdown = Обратный отсчёт
+countdown-title = Обратный отсчёт
+countdown-edit = Изменить событие
+countdown-new = Новое событие
+countdown-add = Добавить событие
+countdown-label-placeholder = Название события (напр. Запуск)
+countdown-pick-date = Выберите дату
+countdown-default-label = Событие { $id }
+create-countdown = Создать событие
+countdown-yearly = Ежегодно
+countdown-yearly-label = Повторять каждый год
+countdown-reminders = Напомнить заранее
+countdown-reminder-5min = За 5 минут
+countdown-reminder-15min = За 15 минут
+countdown-reminder-1hour = За 1 час
+countdown-reminder-1day = За 1 день
+countdown-reminder-1week = За 1 неделю
+countdown-reminder-count = Напоминаний: { $count }
+countdown-reminder-body = { $label } — { $when }
+countdown-arrived = { $label } наступило
+countdown-dhms = { $days } д { $hours } ч { $minutes } м { $seconds } с
+countdown-ago = { $when } (прошло)
+countdown-passed = Прошло
+countdown-edit = Изменить событие
+countdown-days = { $days ->
+    [one] { $days } день
+    [few] { $days } дня
+   *[other] { $days } дней
+}
+notification-countdown = Обратный отсчёт

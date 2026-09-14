@@ -41,9 +41,14 @@ impl WorldClocksState {
             if let Some(coord) = Coordinates::new(lat, lon) {
                 if let Some(nd) = NaiveDate::from_ymd_opt(date.year(), date.month(), date.day()) {
                     let solar = SolarDay::new(coord, nd);
-                    let sunrise = solar.event_time(SolarEvent::Sunrise);
-                    let sunset = solar.event_time(SolarEvent::Sunset);
-                    return now_utc >= sunrise && now_utc < sunset;
+                    // `event_time` returns `None` on polar days, where the event never
+                    // happens; fall through to the hour-based check in that case.
+                    if let (Some(sunrise), Some(sunset)) = (
+                        solar.event_time(SolarEvent::Sunrise),
+                        solar.event_time(SolarEvent::Sunset),
+                    ) {
+                        return now_utc >= sunrise && now_utc < sunset;
+                    }
                 }
             }
         }
@@ -131,7 +136,7 @@ impl WorldClocksState {
             for clock in &self.clocks {
                 let time_in_tz = now_utc.with_timezone(&clock.timezone);
                 let time_str = if use_12h {
-                    time_in_tz.format("%I:%M %p").to_string()
+                    crate::time_format::format_time_of_day(&time_in_tz, true)
                 } else {
                     time_in_tz.format("%H:%M").to_string()
                 };
@@ -151,7 +156,7 @@ impl WorldClocksState {
                 let time_pill =
                     widget::container(widget::text::title4(time_str).font(cosmic::font::bold()))
                         .class(cosmic::theme::Container::custom(move |_theme| {
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(pill_bg)),
                                 border: cosmic::iced::Border {
                                     radius: 8.0.into(),
@@ -227,7 +232,7 @@ impl WorldClocksState {
                             .class(cosmic::theme::Container::Custom(Box::new(
                                 |theme| {
                                     let accent = Color::from(theme.cosmic().accent_color());
-                                    cosmic::iced_widget::container::Style {
+                                    cosmic::iced::widget::container::Style {
                                         background: Some(
                                             cosmic::iced::Background::Color(accent),
                                         ),
@@ -244,7 +249,7 @@ impl WorldClocksState {
 
                     let time_in_tz = now_utc.with_timezone(&clock.timezone);
                     let time_str = if use_12h {
-                        time_in_tz.format("%I:%M %p").to_string()
+                        crate::time_format::format_time_of_day(&time_in_tz, true)
                     } else {
                         time_in_tz.format("%H:%M").to_string()
                     };
@@ -257,7 +262,7 @@ impl WorldClocksState {
                         widget::text::title4(time_str).font(cosmic::font::bold()),
                     )
                     .class(cosmic::theme::Container::custom(move |_theme| {
-                        cosmic::iced_widget::container::Style {
+                        cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Background::Color(pill_bg)),
                             border: cosmic::iced::Border {
                                 radius: 8.0.into(),
@@ -279,7 +284,7 @@ impl WorldClocksState {
                                 .size(16)
                                 .icon()
                                 .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                    |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                         color: Some(theme.cosmic().palette.neutral_7.into()),
                                     },
                                 )))
@@ -324,7 +329,7 @@ impl WorldClocksState {
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(
                             move |theme| {
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -354,7 +359,7 @@ impl WorldClocksState {
                     .map(|clock| {
                         let time_in_tz = now_utc.with_timezone(&clock.timezone);
                         let time_str = if use_12h {
-                            time_in_tz.format("%I:%M %p").to_string()
+                            crate::time_format::format_time_of_day(&time_in_tz, true)
                         } else {
                             time_in_tz.format("%H:%M").to_string()
                         };
@@ -380,7 +385,7 @@ impl WorldClocksState {
                             widget::text::title4(time_str).font(cosmic::font::bold()),
                         )
                         .class(cosmic::theme::Container::custom(move |_theme| {
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(pill_bg)),
                                 border: cosmic::iced::Border {
                                     radius: 8.0.into(),
@@ -413,7 +418,7 @@ impl WorldClocksState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -427,7 +432,7 @@ impl WorldClocksState {
                             })))
                             .into();
 
-                        (card, cosmic::iced_core::widget::tree::State::None, offset)
+                        (card, cosmic::iced::core::widget::tree::State::None, offset)
                     });
 
                 col = col.push(reorder_list);
@@ -472,7 +477,7 @@ impl WorldClocksState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
@@ -520,7 +525,7 @@ impl WorldClocksState {
 
         // ── Center: large time display ──
         let time_str = if use_12h {
-            time_in_tz.format("%I:%M:%S %p").to_string()
+            crate::time_format::format_time_of_day_secs(&time_in_tz, true)
         } else {
             time_in_tz.format("%H:%M:%S").to_string()
         };
@@ -544,8 +549,14 @@ impl WorldClocksState {
                             let sr = solar.event_time(SolarEvent::Sunrise);
                             let ss = solar.event_time(SolarEvent::Sunset);
                             (
-                                Self::format_sun_dt(sr, clock.timezone, use_12h),
-                                Self::format_sun_dt(ss, clock.timezone, use_12h),
+                                sr.map_or_else(
+                                    || fl!("world-clocks-no-sun-data"),
+                                    |dt| Self::format_sun_dt(dt, clock.timezone, use_12h),
+                                ),
+                                ss.map_or_else(
+                                    || fl!("world-clocks-no-sun-data"),
+                                    |dt| Self::format_sun_dt(dt, clock.timezone, use_12h),
+                                ),
                             )
                         }
                         None => (
@@ -602,7 +613,7 @@ impl WorldClocksState {
     fn format_sun_dt(dt: chrono::DateTime<Utc>, tz: chrono_tz::Tz, use_12h: bool) -> String {
         let local = dt.with_timezone(&tz);
         if use_12h {
-            local.format("%I:%M %p").to_string()
+            crate::time_format::format_time_of_day(&local, true)
         } else {
             local.format("%H:%M").to_string()
         }

@@ -27,6 +27,13 @@ impl Player {
     }
 }
 
+/// One completed move: who played it and how long they spent on it.
+#[derive(Debug, Clone, Copy)]
+pub struct MoveRecord {
+    pub player: Player,
+    pub elapsed: Duration,
+}
+
 pub struct ChessState {
     pub white_remaining: Duration,
     pub black_remaining: Duration,
@@ -39,6 +46,10 @@ pub struct ChessState {
     /// Baseline for the active clock (set when it started ticking).
     pub start_instant: Option<Instant>,
     pub active_started_remaining: Duration,
+    /// Every completed move in order, White first. Session-only — not persisted.
+    /// Per-player move counts and last-move times are derived from this rather
+    /// than tracked separately, so there is one source of truth.
+    pub moves: Vec<MoveRecord>,
     // Configuration
     pub base_minutes: u32,
     pub increment_secs: u32,
@@ -64,6 +75,7 @@ impl ChessState {
             flagged: None,
             start_instant: None,
             active_started_remaining: base,
+            moves: Vec::new(),
             base_minutes,
             increment_secs,
             edit_base_minutes: base_minutes,
@@ -108,6 +120,47 @@ impl ChessState {
                 .active_started_remaining
                 .saturating_sub(start.elapsed());
             self.set_remaining(self.current_turn, remaining);
+        }
+    }
+
+    pub fn moves_of(&self, player: Player) -> u32 {
+        self.moves.iter().filter(|m| m.player == player).count() as u32
+    }
+
+    pub fn last_move_of(&self, player: Player) -> Option<Duration> {
+        self.moves
+            .iter()
+            .rev()
+            .find(|m| m.player == player)
+            .map(|m| m.elapsed)
+    }
+
+    /// Record that `player` completed a move taking `elapsed`.
+    pub(super) fn record_move(&mut self, player: Player, elapsed: Duration) {
+        self.moves.push(MoveRecord { player, elapsed });
+    }
+
+    /// True before either clock has run — used to show a "press to start" hint
+    /// rather than the misleading "Paused".
+    pub fn is_fresh(&self) -> bool {
+        !self.running && self.flagged.is_none() && self.moves.is_empty()
+    }
+
+    /// Fraction of this player's base time still remaining, clamped to 0..=1.
+    /// Increments can push a clock above its base, hence the clamp.
+    pub fn remaining_fraction(&self, player: Player) -> f32 {
+        let base = (self.base_minutes as f32 * 60.0).max(1.0);
+        (self.remaining_of(player).as_secs_f32() / base).clamp(0.0, 1.0)
+    }
+
+    /// Name of the preset matching the current time control, if any.
+    pub fn preset_name(&self) -> Option<String> {
+        match (self.base_minutes, self.increment_secs) {
+            (1, 0) => Some(fl!("chess-preset-bullet")),
+            (3, 2) => Some(fl!("chess-preset-blitz")),
+            (10, 0) => Some(fl!("chess-preset-rapid")),
+            (30, 0) => Some(fl!("chess-preset-classical")),
+            _ => None,
         }
     }
 }

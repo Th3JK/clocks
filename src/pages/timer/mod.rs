@@ -24,6 +24,9 @@ pub enum Message {
     ResumeTimer(u32),
     ResetTimer(u32),
     DeleteTimer(u32),
+    // Focus mode (single timer, full page)
+    Focus(u32),
+    Unfocus,
     BrowseCustomSound,
     Tick,
     // Edit mode

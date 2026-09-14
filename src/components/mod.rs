@@ -7,6 +7,8 @@ pub mod sound_selector;
 pub mod time_picker;
 
 pub use circular_progress::CircularProgress;
-pub use duration::{format_duration, format_duration_hms, format_duration_parts};
-pub use sound_selector::{sound_selector_view, SOUND_OPTIONS};
-pub use time_picker::{time_picker, TimeUnit};
+pub use duration::{
+    format_duration, format_duration_clock, format_duration_hms, format_duration_parts,
+};
+pub use sound_selector::sound_selector_view;
+pub use time_picker::{time_picker, time_picker_row, TimeUnit};

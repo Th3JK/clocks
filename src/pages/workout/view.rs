@@ -29,11 +29,298 @@ fn mmss(d: Duration) -> String {
 
 impl WorkoutState {
     pub fn view(&self) -> Element<'_, Message> {
+        // The block editor takes over the page while open — it needs the room.
+        if let Some(id) = self.editing_blocks_id
+            && let Some(w) = self.workouts.iter().find(|w| w.id == id)
+        {
+            return self.block_editor_view(&w.label);
+        }
+        // Focus mode wins over every other mode. The id is re-looked-up rather
+        // than trusted: if it no longer resolves (deleted elsewhere) we fall back
+        // to the list instead of rendering a blank page.
+        if let Some(id) = self.focused_id
+            && let Some(w) = self.workouts.iter().find(|w| w.id == id)
+        {
+            return self.focus_view(w);
+        }
         if self.edit_mode {
             self.edit_mode_view()
         } else {
             self.card_grid_view()
         }
+    }
+
+    /// Full-page block editor: blocks as cards, steps as rows inside them.
+    /// Operates on `edit_blocks`, a working copy, so closing without saving
+    /// discards the changes.
+    fn block_editor_view(&self, label: &str) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .spacing(spacing.space_xs)
+            .push(
+                widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+                    .on_press(Message::CloseBlockEditor),
+            )
+            .push(
+                widget::container(widget::text::title3(fl!(
+                    "workout-edit-blocks-title",
+                    label = label.to_string()
+                )))
+                .width(Length::Fill),
+            )
+            .push(widget::button::suggested(fl!("save")).on_press(Message::SaveBlocks));
+
+        let mut col = widget::column::with_capacity(self.edit_blocks.len() + 3)
+            .spacing(spacing.space_s)
+            .width(Length::Fill);
+
+        for (bi, block) in self.edit_blocks.iter().enumerate() {
+            col = col.push(self.block_card(bi, block));
+        }
+
+        // Total of the working copy, so the effect of an edit is visible before
+        // saving. Uses the same flattening the runtime will use.
+        let total: u32 = flatten(&self.edit_blocks).iter().map(|s| s.secs).sum();
+        let footer = widget::row::with_capacity(2)
+            .align_y(Alignment::Center)
+            .push(
+                widget::button::standard(fl!("workout-add-block"))
+                    .leading_icon(widget::icon::from_name("list-add-symbolic"))
+                    .on_press(Message::AddBlock),
+            )
+            .push(
+                widget::container(widget::text::body(fl!(
+                    "workout-total-duration",
+                    total = mmss(Duration::from_secs(total as u64))
+                )))
+                .align_x(Alignment::End)
+                .width(Length::Fill),
+            );
+        col = col.push(footer);
+
+        widget::column::with_capacity(2)
+            .spacing(spacing.space_s)
+            .padding(spacing.space_xs)
+            .push(header)
+            .push(widget::scrollable(col).height(Length::Fill))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    }
+
+    /// One block: repeat count, skip toggle, reorder/remove, and its steps.
+    fn block_card<'a>(&'a self, bi: usize, block: &'a Block) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let icon_btn = |name: &str, msg: Message| {
+            widget::button::icon(widget::icon::from_name(name))
+                .extra_small()
+                .on_press(msg)
+        };
+
+        let head = widget::row::with_capacity(6)
+            .align_y(Alignment::Center)
+            .spacing(spacing.space_xxs)
+            .push(
+                widget::text::body(fl!("workout-block-n", n = (bi + 1).to_string()))
+                    .width(Length::Fill),
+            )
+            .push(widget::text::caption(fl!("workout-repeat")))
+            .push(icon_btn(
+                "list-remove-symbolic",
+                Message::SetBlockRepeat(bi, block.repeat.saturating_sub(1)),
+            ))
+            .push(widget::text::body(format!("{}×", block.repeat)))
+            .push(icon_btn(
+                "list-add-symbolic",
+                Message::SetBlockRepeat(bi, block.repeat + 1),
+            ))
+            .push(icon_btn("go-up-symbolic", Message::MoveBlock(bi, -1)))
+            .push(icon_btn("go-down-symbolic", Message::MoveBlock(bi, 1)))
+            .push(icon_btn("edit-delete-symbolic", Message::RemoveBlock(bi)));
+
+        let mut col = widget::column::with_capacity(block.steps.len() + 3)
+            .spacing(spacing.space_xxs)
+            .push(head)
+            .push(widget::divider::horizontal::default());
+
+        for (si, step) in block.steps.iter().enumerate() {
+            col = col.push(self.step_row(bi, si, step));
+        }
+
+        let footer = widget::row::with_capacity(2)
+            .align_y(Alignment::Center)
+            .spacing(spacing.space_xs)
+            .push(
+                widget::button::standard(fl!("workout-add-step"))
+                    .leading_icon(widget::icon::from_name("list-add-symbolic"))
+                    .on_press(Message::AddStep(bi)),
+            )
+            .push(
+                widget::container(
+                    widget::checkbox(block.skip_last_recovery)
+                        .label(fl!("workout-skip-last-recovery"))
+                        .on_toggle(move |_| Message::ToggleSkipLastRecovery(bi)),
+                )
+                .align_x(Alignment::End)
+                .width(Length::Fill),
+            );
+        col = col.push(footer);
+
+        widget::container(col)
+            .padding(spacing.space_s)
+            .width(Length::Fill)
+            .class(cosmic::theme::Container::Custom(Box::new(|theme| {
+                let cosmic = theme.cosmic();
+                let mut style = cosmic::iced::widget::container::Catalog::style(
+                    theme,
+                    &cosmic::theme::Container::Primary,
+                );
+                style.border.radius = cosmic.radius_s().into();
+                style.background = Some(Color::from(cosmic.bg_component_color()).into());
+                style
+            })))
+            .into()
+    }
+
+    /// One step row: label, duration, kind picker, reorder/remove.
+    fn step_row<'a>(&'a self, bi: usize, si: usize, step: &'a Step) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let icon_btn = |name: &str, msg: Message| {
+            widget::button::icon(widget::icon::from_name(name))
+                .extra_small()
+                .on_press(msg)
+        };
+
+        // Kind is an explicit three-way choice rather than inferred from the
+        // label — label matching would break in five of the six locales.
+        let kind_picker = widget::row::with_children(
+            StepKind::ALL
+                .iter()
+                .map(|k| {
+                    let k = *k;
+                    let selected = step.kind == k;
+                    let btn = widget::button::text(k.display_name()).class(if selected {
+                        cosmic::theme::Button::Suggested
+                    } else {
+                        cosmic::theme::Button::Standard
+                    });
+                    btn.on_press(Message::SetStepKind(bi, si, k)).into()
+                })
+                .collect::<Vec<_>>(),
+        )
+        .spacing(spacing.space_xxxs);
+
+        widget::row::with_capacity(6)
+            .align_y(Alignment::Center)
+            .spacing(spacing.space_xxs)
+            .push(
+                widget::text_input(step.kind.default_label(), &step.label)
+                    .on_input(move |v| Message::SetStepLabel(bi, si, v))
+                    .width(Length::Fill),
+            )
+            .push(icon_btn(
+                "list-remove-symbolic",
+                Message::SetStepSecs(bi, si, step.secs.saturating_sub(5)),
+            ))
+            .push(widget::text::body(fl!(
+                "seconds-value",
+                value = step.secs.to_string()
+            )))
+            .push(icon_btn(
+                "list-add-symbolic",
+                Message::SetStepSecs(bi, si, step.secs + 5),
+            ))
+            .push(kind_picker)
+            .push(icon_btn("go-up-symbolic", Message::MoveStep(bi, si, -1)))
+            .push(icon_btn("go-down-symbolic", Message::MoveStep(bi, si, 1)))
+            .push(icon_btn("edit-delete-symbolic", Message::RemoveStep(bi, si)))
+            .into()
+    }
+
+    /// Full-page view of a single workout: back header, large ring, status, controls.
+    fn focus_view<'a>(&'a self, w: &'a WorkoutEntry) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+
+        let back = widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+            .on_press(Message::Unfocus);
+
+        let header = widget::row::with_capacity(3)
+            .align_y(Alignment::Center)
+            .push(back)
+            .push(
+                widget::container(widget::text::title3(&w.label))
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill),
+            )
+            // Balances the back button so the title stays optically centred.
+            .push(widget::Space::new().width(40.0));
+
+        let total = w.step_total().as_secs_f32();
+        let progress = if total > 0.0 {
+            1.0 - (w.remaining.as_secs_f32() / total)
+        } else {
+            0.0
+        };
+
+        let cosmic = cosmic::theme::active();
+        let fill_color: Color = if w.is_effort() {
+            cosmic.cosmic().accent_color().into()
+        } else {
+            cosmic.cosmic().palette.neutral_6.into()
+        };
+
+        let circle_size = 280.0;
+        let circle = CircularProgress::new(progress)
+            .size(circle_size)
+            .stroke_width(10.0)
+            .track_color(Color::from_rgba(0.5, 0.5, 0.5, 0.15))
+            .fill_color(fill_color)
+            .view();
+
+        let time_text = widget::text(mmss(w.remaining)).size(56.0).font(light_font());
+
+        let hero = widget::container(
+            cosmic::iced::widget::stack![
+                circle,
+                widget::container(time_text)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .width(circle_size)
+                    .height(circle_size),
+            ]
+            .width(circle_size)
+            .height(circle_size),
+        )
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+        let status = widget::container(widget::text::body(fl!(
+            "workout-status-blocks",
+            step = w.current_step().map(|s| s.label.clone()).unwrap_or_else(|| fl!("workout-done")),
+            block = w.current_step().map(|s| s.block.to_string()).unwrap_or_default(),
+            blocks = w.current_step().map(|s| s.blocks.to_string()).unwrap_or_default(),
+            rep = w.current_step().map(|s| s.rep.to_string()).unwrap_or_default(),
+            reps = w.current_step().map(|s| s.reps.to_string()).unwrap_or_default()
+        )))
+        .align_x(Alignment::Center)
+        .width(Length::Fill);
+
+        widget::column::with_capacity(4)
+            .spacing(spacing.space_s)
+            .padding(spacing.space_xs)
+            .push(header)
+            .push(hero)
+            .push(status)
+            .push(self.card_controls(w))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 
     fn card_grid_view(&self) -> Element<'_, Message> {
@@ -67,16 +354,16 @@ impl WorkoutState {
         let spacing = cosmic::theme::spacing();
         let id = w.id;
 
-        let total = w.phase_total().as_secs_f32();
+        let total = w.step_total().as_secs_f32();
         let progress = if total > 0.0 {
             1.0 - (w.remaining.as_secs_f32() / total)
         } else {
             0.0
         };
 
-        // Work phases use the accent color; rest/prep use a neutral tone.
+        // Effort steps use the accent color; rest/prep use a neutral tone.
         let cosmic = cosmic::theme::active();
-        let fill_color: Color = if w.phase == Phase::Work {
+        let fill_color: Color = if w.is_effort() {
             cosmic.cosmic().accent_color().into()
         } else {
             cosmic.cosmic().palette.neutral_6.into()
@@ -94,7 +381,7 @@ impl WorkoutState {
         let time_text = widget::text(mmss(w.remaining)).size(28.0).font(light_font());
 
         let circle_with_time = widget::container(
-            cosmic::iced_widget::stack![
+            cosmic::iced::widget::stack![
                 circle,
                 widget::container(time_text)
                     .align_x(Alignment::Center)
@@ -113,12 +400,12 @@ impl WorkoutState {
             .width(Length::Fill);
 
         let status = widget::container(widget::text::caption(fl!(
-            "workout-status",
-            phase = w.phase.display_name(),
-            round = w.current_round.to_string(),
-            rounds = w.rounds.to_string(),
-            set = w.current_set.to_string(),
-            sets = w.sets.to_string()
+            "workout-status-blocks",
+            step = w.current_step().map(|s| s.label.clone()).unwrap_or_else(|| fl!("workout-done")),
+            block = w.current_step().map(|s| s.block.to_string()).unwrap_or_default(),
+            blocks = w.current_step().map(|s| s.blocks.to_string()).unwrap_or_default(),
+            rep = w.current_step().map(|s| s.rep.to_string()).unwrap_or_default(),
+            reps = w.current_step().map(|s| s.reps.to_string()).unwrap_or_default()
         )))
         .align_x(Alignment::Center)
         .width(Length::Fill);
@@ -138,7 +425,7 @@ impl WorkoutState {
             .width(Length::Fill)
             .max_width(340.0)
             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                let mut style = cosmic::iced_widget::container::Catalog::style(
+                let mut style = cosmic::iced::widget::container::Catalog::style(
                     theme,
                     &cosmic::theme::Container::Primary,
                 );
@@ -147,13 +434,9 @@ impl WorkoutState {
                 style
             })));
 
-        if !w.is_running {
-            widget::mouse_area(card)
-                .on_press(Message::StartEditWorkout(id))
-                .into()
-        } else {
-            card.into()
-        }
+        // Pressing the card enters focus mode, mirroring World Clocks' detail
+        // view. Editing moved to the pencil in the controls row.
+        widget::mouse_area(card).on_press(Message::Focus(id)).into()
     }
 
     fn card_controls(&self, w: &WorkoutEntry) -> Element<'_, Message> {
@@ -167,7 +450,7 @@ impl WorkoutState {
                 Message::Pause(id),
                 false,
             )
-        } else if w.has_started() && w.phase != Phase::Done {
+        } else if w.has_started() && !w.is_finished() {
             (
                 "media-playback-start-symbolic",
                 fl!("tooltip-resume"),
@@ -201,10 +484,12 @@ impl WorkoutState {
             widget::tooltip::Position::Top,
         );
 
-        let small_btn = |icon: &str, tip: String, msg: Message| -> Element<'_, Message> {
+        // Takes a built `Icon` rather than a theme name so callers can pass a
+        // bundled SVG for glyphs the icon theme may not have.
+        let small_btn = |icon: widget::icon::Icon, tip: String, msg: Message| -> Element<'_, Message> {
             widget::tooltip(
                 widget::button::custom(
-                    widget::container(widget::icon::from_name(icon).size(16).icon())
+                    widget::container(icon.size(16))
                         .align_x(Alignment::Center)
                         .align_y(Alignment::Center)
                         .width(32)
@@ -235,14 +520,26 @@ impl WorkoutState {
             .into()
         };
 
+        // Reset takes priority once the workout has started. Before that the slot
+        // is free, so it carries the edit affordance that pressing the card used
+        // to provide (the press now enters focus mode). A started workout is still
+        // editable after a reset, or from edit mode.
         let left_slot: Element<'_, Message> = if w.has_started() {
-            small_btn("edit-undo-symbolic", fl!("tooltip-reset"), Message::Reset(id))
-        } else {
-            invisible_btn()
-        };
-        let right_slot: Element<'_, Message> = if w.started && w.phase != Phase::Done {
             small_btn(
-                "media-skip-forward-symbolic",
+                widget::icon::from_name("edit-undo-symbolic").icon(),
+                fl!("tooltip-reset"),
+                Message::Reset(id),
+            )
+        } else {
+            small_btn(
+                widget::icon::from_name("edit-symbolic").icon(),
+                fl!("workout-edit"),
+                Message::StartEditWorkout(id),
+            )
+        };
+        let right_slot: Element<'_, Message> = if w.started && !w.is_finished() {
+            small_btn(
+                widget::icon::from_name("media-skip-forward-symbolic").icon(),
                 fl!("tooltip-skip"),
                 Message::Skip(id),
             )
@@ -291,7 +588,7 @@ impl WorkoutState {
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                             let accent = Color::from(theme.cosmic().accent_color());
-                            cosmic::iced_widget::container::Style {
+                            cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Background::Color(accent)),
                                 border: cosmic::iced::Border {
                                     radius: 2.0.into(),
@@ -310,7 +607,7 @@ impl WorkoutState {
                         .size(16)
                         .icon()
                         .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                            |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                            |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().palette.neutral_7.into()),
                             },
                         )))
@@ -321,9 +618,8 @@ impl WorkoutState {
                     .push(widget::text::body(&w.label))
                     .push(widget::text::caption(fl!(
                         "workout-summary",
-                        work = w.work_secs.to_string(),
-                        rest = w.rest_secs.to_string(),
-                        rounds = w.rounds.to_string()
+                        blocks = w.blocks.len().to_string(),
+                        total = mmss(w.total_duration())
                     )));
                 items.push(info_col.width(Length::Fill).into());
                 items.push(
@@ -342,7 +638,7 @@ impl WorkoutState {
                     .padding(8)
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -384,7 +680,7 @@ impl WorkoutState {
                     .width(Length::Fill)
                     .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                         let accent = Color::from(theme.cosmic().accent_color());
-                        let mut style = cosmic::iced_widget::container::Catalog::style(
+                        let mut style = cosmic::iced::widget::container::Catalog::style(
                             theme,
                             &cosmic::theme::Container::Primary,
                         );
@@ -397,7 +693,7 @@ impl WorkoutState {
                     })))
                     .into();
 
-                (card, cosmic::iced_core::widget::tree::State::None, offset)
+                (card, cosmic::iced::core::widget::tree::State::None, offset)
             });
 
         col = col.push(reorder_list);
@@ -436,7 +732,7 @@ impl WorkoutState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
@@ -461,17 +757,49 @@ impl WorkoutState {
         let editing = self.editing_id.is_some();
         let mut col = widget::column::with_capacity(16).spacing(spacing);
 
-        col = col.push(widget::text::title4(if editing {
-            fl!("workout-edit")
-        } else {
-            fl!("workout-new")
-        }));
-
         col = col.push(
             widget::text_input(fl!("workout-label-placeholder"), &self.edit_label)
                 .id(widget::Id::new("workout-label-input"))
                 .on_input(Message::EditLabel),
         );
+
+        // Editing an existing workout: structure lives in the block editor. The
+        // steppers below describe a simple prep/work/rest layout and cannot
+        // represent an arbitrary block list, so showing them here would either
+        // lie about the current structure or silently overwrite it on save.
+        if editing {
+            if let Some(id) = self.editing_id {
+                col = col.push(widget::divider::horizontal::default());
+                col = col.push(
+                    widget::button::standard(fl!("workout-edit-blocks"))
+                        .leading_icon(widget::icon::from_name("view-list-symbolic"))
+                        .on_press(Message::OpenBlockEditor(id)),
+                );
+                if let Some(w) = self.workouts.iter().find(|w| w.id == id) {
+                    col = col.push(widget::text::caption(fl!(
+                        "workout-summary",
+                        blocks = w.blocks.len().to_string(),
+                        total = mmss(w.total_duration())
+                    )));
+                }
+            }
+            col = col.push(widget::divider::horizontal::default());
+            col = col.push(sound_selector_view(
+                fl!("sound"),
+                &self.edit_sound,
+                Message::EditSound,
+                Message::BrowseCustomSound,
+            ));
+            col = col.push(widget::divider::horizontal::default());
+            let actions = widget::row::with_capacity(2)
+                .spacing(8)
+                .push(
+                    widget::button::standard(fl!("cancel"))
+                        .on_press(Message::CancelEditWorkout),
+                )
+                .push(widget::button::suggested(fl!("save")).on_press(Message::SaveEditWorkout));
+            return col.push(actions).into();
+        }
 
         // Presets
         col = col.push(widget::text::body(fl!("workout-presets")));

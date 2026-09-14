@@ -4,16 +4,17 @@
 // and restoring page states from a saved `Config`.
 
 use crate::config::{
-    Config, PomodoroDayStat, PomodoroDefaults, SavedAlarm, SavedChessConfig, SavedClock, SavedLap,
-    SavedPomodoro, SavedRepeatMode, SavedStopwatchRecord, SavedTimer, SavedWorkout,
+    Config, PomodoroDayStat, PomodoroDefaults, SavedAlarm, SavedBlock, SavedChessConfig,
+    SavedClock, SavedCountdownEvent, SavedLap, SavedPomodoro, SavedRepeatMode, SavedStep,
+    SavedStepKind, SavedStopwatchRecord, SavedTimer, SavedWorkout,
 };
-use crate::pages::{alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
+use crate::pages::{alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks};
 use std::time::Duration;
 
 // --- Persistence: build Config from runtime state ---
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn build_config_from_state(
+pub fn build_config_from_state(
     wc: &world_clocks::WorldClocksState,
     al: &alarm::AlarmState,
     ti: &timer::TimerState,
@@ -21,7 +22,10 @@ pub(super) fn build_config_from_state(
     sw: &stopwatch::StopwatchState,
     ch: &chess::ChessState,
     wo: &workout::WorkoutState,
-    use_12h: bool,
+    co: &countdown::CountdownState,
+    nav_order: &[crate::pages::Page],
+    nav_hidden: &[crate::pages::Page],
+    time_format: crate::time_format::TimeFormat,
     confirm_delete_alarm: bool,
     confirm_delete_timer: bool,
     confirm_delete_world_clock: bool,
@@ -53,6 +57,7 @@ pub(super) fn build_config_from_state(
                 ),
             };
             SavedAlarm {
+                id: a.id,
                 hour: a.hour,
                 minute: a.minute,
                 label: a.label.clone(),
@@ -69,6 +74,7 @@ pub(super) fn build_config_from_state(
         .timers
         .iter()
         .map(|t| SavedTimer {
+            id: t.id,
             label: t.label.clone(),
             duration_secs: t.initial_duration.as_secs(),
             repeat_enabled: t.repeat_enabled,
@@ -81,6 +87,7 @@ pub(super) fn build_config_from_state(
         .timers
         .iter()
         .map(|p| SavedPomodoro {
+            id: p.id,
             label: p.label.clone(),
             work_minutes: p.work_minutes,
             short_break_minutes: p.short_break_minutes,
@@ -132,13 +139,21 @@ pub(super) fn build_config_from_state(
         .iter()
         .map(|w| SavedWorkout {
             label: w.label.clone(),
-            prep_secs: w.prep_secs,
-            work_secs: w.work_secs,
-            rest_secs: w.rest_secs,
-            rounds: w.rounds,
-            sets: w.sets,
-            set_rest_secs: w.set_rest_secs,
             sound: w.sound.clone(),
+            blocks: w.blocks.iter().map(save_block).collect(),
+        })
+        .collect();
+
+    let countdown_events = co
+        .events
+        .iter()
+        .map(|e| SavedCountdownEvent {
+            id: e.id,
+            label: e.label.clone(),
+            target: e.target,
+            yearly: e.yearly,
+            sound: e.sound.clone(),
+            reminders: e.reminders.iter().map(|r| r.key().to_string()).collect(),
         })
         .collect();
 
@@ -148,7 +163,10 @@ pub(super) fn build_config_from_state(
         timers,
         pomodoros,
         pomodoro_defaults,
-        use_12h,
+        // The legacy flag mirrors the preference only when it is concrete; a
+        // System preference leaves it at its last explicit value so an older
+        // build still gets something sensible.
+        time_format,
         confirm_delete_alarm,
         confirm_delete_timer,
         confirm_delete_world_clock,
@@ -161,14 +179,109 @@ pub(super) fn build_config_from_state(
         pomodoro_stats,
         chess,
         workouts,
+        countdown_events,
+        nav_order: nav_order.iter().map(|p| p.key().to_string()).collect(),
+        nav_hidden: nav_hidden.iter().map(|p| p.key().to_string()).collect(),
     }
 }
 
-pub(super) fn restore_chess(config: &Config) -> chess::ChessState {
+/// Sidebar order and hidden set from the config.
+///
+/// An empty stored order means the sidebar was never customised, so fall back
+/// to the built-in order. Any page missing from a stored order is appended:
+/// that is how a page added in a later release shows up instead of silently
+/// vanishing for anyone with a saved layout.
+pub fn restore_nav(config: &Config) -> (Vec<crate::pages::Page>, Vec<crate::pages::Page>) {
+    use crate::pages::Page;
+    let mut order: Vec<Page> = config
+        .nav_order
+        .iter()
+        .filter_map(|k| Page::from_key(k))
+        .collect();
+    for page in Page::ALL {
+        if !order.contains(&page) {
+            order.push(page);
+        }
+    }
+    let hidden = config
+        .nav_hidden
+        .iter()
+        .filter_map(|k| Page::from_key(k))
+        .collect();
+    (order, hidden)
+}
+
+pub fn restore_chess(config: &Config) -> chess::ChessState {
     chess::ChessState::new(config.chess.base_minutes, config.chess.increment_secs)
 }
 
-pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
+pub fn restore_countdowns(config: &Config) -> countdown::CountdownState {
+    let mut state = countdown::CountdownState::default();
+    for e in &config.countdown_events {
+        let mut event = countdown::CountdownEvent::new(e.id, e.label.clone(), e.target);
+        event.yearly = e.yearly;
+        event.sound = e.sound.clone();
+        // Unknown reminder names are dropped rather than failing the load, so
+        // the preset list can change without invalidating saved events.
+        event.reminders = e
+            .reminders
+            .iter()
+            .filter_map(|k| countdown::Reminder::from_key(k))
+            .collect();
+        // `fired` and `arrived` are the daemon's now -- they arrive through
+        // UpdateRuntime rather than from the config.
+        state.events.push(event);
+    }
+    // From the highest id in use: positional ids collide after deletions.
+    state.next_id = state.events.iter().map(|e| e.id).max().unwrap_or(0) + 1;
+    state
+}
+
+fn save_step_kind(kind: workout::StepKind) -> SavedStepKind {
+    match kind {
+        workout::StepKind::Prep => SavedStepKind::Prep,
+        workout::StepKind::Effort => SavedStepKind::Effort,
+        workout::StepKind::Recovery => SavedStepKind::Recovery,
+    }
+}
+
+fn load_step_kind(kind: SavedStepKind) -> workout::StepKind {
+    match kind {
+        SavedStepKind::Prep => workout::StepKind::Prep,
+        SavedStepKind::Effort => workout::StepKind::Effort,
+        SavedStepKind::Recovery => workout::StepKind::Recovery,
+    }
+}
+
+fn save_block(block: &workout::Block) -> SavedBlock {
+    SavedBlock {
+        repeat: block.repeat,
+        skip_last_recovery: block.skip_last_recovery,
+        steps: block
+            .steps
+            .iter()
+            .map(|s| SavedStep {
+                label: s.label.clone(),
+                secs: s.secs,
+                kind: save_step_kind(s.kind),
+            })
+            .collect(),
+    }
+}
+
+fn load_block(block: &SavedBlock) -> workout::Block {
+    workout::Block::new(
+        block.repeat,
+        block
+            .steps
+            .iter()
+            .map(|s| workout::Step::new(s.label.clone(), s.secs, load_step_kind(s.kind)))
+            .collect(),
+        block.skip_last_recovery,
+    )
+}
+
+pub fn restore_workouts(config: &Config) -> workout::WorkoutState {
     if config.workouts.is_empty() {
         return workout::WorkoutState::default();
     }
@@ -178,25 +291,26 @@ pub(super) fn restore_workouts(config: &Config) -> workout::WorkoutState {
         ..Default::default()
     };
     for (i, w) in config.workouts.iter().enumerate() {
+        // Workouts saved before blocks existed carry `None` here; lower their
+        // six scalars into the equivalent block layout so they behave exactly
+        // as they did before.
+        let blocks = w.blocks.iter().map(load_block).collect();
         state.workouts.push(workout::WorkoutEntry::new(
             (i + 1) as u32,
             w.label.clone(),
-            w.prep_secs,
-            w.work_secs,
-            w.rest_secs,
-            w.rounds,
-            w.sets,
-            w.set_rest_secs,
+            blocks,
             w.sound.clone(),
         ));
     }
-    state.next_id = config.workouts.len() as u32 + 1;
+    // Derive from the highest id in use rather than the count: positional ids
+    // collide with a live id after deletions.
+    state.next_id = state.workouts.iter().map(|w| w.id).max().unwrap_or(0) + 1;
     state
 }
 
 // --- Persistence: restore runtime state from Config ---
 
-pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocksState {
+pub fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocksState {
     if config.world_clocks.is_empty() {
         return world_clocks::WorldClocksState::default();
     }
@@ -239,12 +353,11 @@ pub(super) fn restore_world_clocks(config: &Config) -> world_clocks::WorldClocks
     }
 }
 
-pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
+pub fn restore_alarms(config: &Config) -> alarm::AlarmState {
     let alarms: Vec<alarm::AlarmEntry> = config
         .alarms
         .iter()
-        .enumerate()
-        .map(|(i, a)| {
+        .map(|a| {
             let repeat_mode = match &a.repeat_mode {
                 SavedRepeatMode::Once => alarm::RepeatMode::Once,
                 SavedRepeatMode::EveryDay => alarm::RepeatMode::EveryDay,
@@ -269,27 +382,27 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
                     }
                 }
             };
-            // Migrate "Default" sound to "Bell"
-            let sound = if a.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                a.sound.clone()
-            };
             alarm::AlarmEntry {
-                id: (i + 1) as u32,
+                id: a.id,
                 hour: a.hour,
                 minute: a.minute,
                 label: a.label.clone(),
                 is_enabled: a.is_enabled,
                 repeat_mode,
-                sound,
+                sound: a.sound.clone(),
                 snooze_minutes: a.snooze_minutes,
                 ring_minutes: a.ring_minutes,
             }
         })
         .collect();
 
-    let next_id = alarms.len() as u32 + 1;
+    // From the highest id in use, never the count: with deletions in play
+    // `len() + 1` can collide with a live id.
+    let next_id = alarms.iter().map(|a| a.id).max().unwrap_or(0) + 1;
+
+    // Snoozes live in the daemon's runtime state, not here -- the GUI receives
+    // them through `Message::UpdateRuntime`.
+    let snoozed = Vec::new();
 
     alarm::AlarmState {
         alarms,
@@ -297,28 +410,22 @@ pub(super) fn restore_alarms(config: &Config) -> alarm::AlarmState {
         editing: None,
         last_triggered_minute: None,
         ringing: Vec::new(),
-        snoozed: Vec::new(),
+        snoozed,
         edit_mode: false,
         dragging_index: None,
         pre_drag_order: Vec::new(),
+        last_saved_id: None,
     }
 }
 
-pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
+pub fn restore_timers(config: &Config) -> timer::TimerState {
     let timers: Vec<timer::TimerEntry> = config
         .timers
         .iter()
-        .enumerate()
-        .map(|(i, t)| {
+        .map(|t| {
             let dur = Duration::from_secs(t.duration_secs);
-            // Migrate "Default" sound to "Bell"
-            let sound = if t.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                t.sound.clone()
-            };
             timer::TimerEntry {
-                id: (i + 1) as u32,
+                id: t.id,
                 label: t.label.clone(),
                 initial_duration: dur,
                 remaining: dur,
@@ -328,12 +435,14 @@ pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
                 repeat_enabled: t.repeat_enabled,
                 repeat_count: t.repeat_count,
                 completed_count: 0,
-                sound,
+                sound: t.sound.clone(),
             }
         })
         .collect();
 
-    let next_id = timers.len() as u32 + 1;
+    // From the highest id in use, not the count: with deletions in play
+    // `len() + 1` collides with a live id.
+    let next_id = timers.iter().map(|t| t.id).max().unwrap_or(0) + 1;
 
     timer::TimerState {
         timers,
@@ -350,10 +459,11 @@ pub(super) fn restore_timers(config: &Config) -> timer::TimerState {
         edit_mode: false,
         dragging_index: None,
         pre_drag_order: Vec::new(),
+        focused_id: None,
     }
 }
 
-pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
+pub fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     let mut state = pomodoro::PomodoroState {
         default_work_minutes: config.pomodoro_defaults.work_minutes,
         default_short_break_minutes: config.pomodoro_defaults.short_break_minutes,
@@ -363,23 +473,20 @@ pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
 
     if !config.pomodoros.is_empty() {
         state.timers.clear();
-        for (i, p) in config.pomodoros.iter().enumerate() {
+        for p in &config.pomodoros {
             let mut timer = pomodoro::PomodoroTimer::from_config(
-                i as u32,
+                p.id,
                 p.label.clone(),
                 p.work_minutes,
                 p.short_break_minutes,
                 p.long_break_minutes,
             );
-            // Migrate "Default" sound to "Bell"
-            timer.sound = if p.sound == "Default" {
-                "Bell".to_string()
-            } else {
-                p.sound.clone()
-            };
+            timer.sound = p.sound.clone();
             state.timers.push(timer);
         }
-        state.next_id = config.pomodoros.len() as u32;
+        // Highest id in use, not the count: positional numbering collides with
+        // a live id once anything has been deleted.
+        state.next_id = state.timers.iter().map(|t| t.id).max().unwrap_or(0) + 1;
     }
 
     state.daily_stats = config
@@ -400,7 +507,7 @@ pub(super) fn restore_pomodoros(config: &Config) -> pomodoro::PomodoroState {
     state
 }
 
-pub(super) fn restore_stopwatch_history(config: &Config) -> stopwatch::StopwatchState {
+pub fn restore_stopwatch_history(config: &Config) -> stopwatch::StopwatchState {
     let history: Vec<stopwatch::StopwatchRecord> = config
         .stopwatch_history
         .iter()

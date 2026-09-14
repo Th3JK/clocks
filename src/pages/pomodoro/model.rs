@@ -153,6 +153,8 @@ pub struct PomodoroState {
     pub edit_mode: bool,
     pub dragging_index: Option<usize>,
     pub pre_drag_order: Vec<u32>,
+    /// Pomodoro shown full-page in focus mode. Session-only, not persisted.
+    pub focused_id: Option<u32>,
     // Global focus statistics, date-indexed (pruned to the last ~90 days)
     pub daily_stats: Vec<DayStat>,
 }
@@ -174,6 +176,7 @@ impl Default for PomodoroState {
             edit_mode: false,
             dragging_index: None,
             pre_drag_order: Vec::new(),
+            focused_id: None,
             daily_stats: Vec::new(),
         };
         // Create a default pomodoro timer
@@ -191,7 +194,7 @@ impl PomodoroState {
 
     /// Record a completed work session of `secs` into today's stats, then prune
     /// entries older than ~90 days.
-    pub(super) fn record_completed_work(&mut self, secs: u64) {
+    pub fn record_completed_work(&mut self, secs: u64) {
         let today = chrono::Local::now().date_naive();
         if let Some(entry) = self.daily_stats.iter_mut().find(|d| d.date == today) {
             entry.focus_secs += secs;

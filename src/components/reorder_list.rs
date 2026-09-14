@@ -24,10 +24,10 @@ use cosmic::iced::clipboard::dnd::{DndAction, DndDestinationRectangle, DndEvent,
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::id::Internal;
 use cosmic::iced::{mouse, overlay, touch, Length, Point, Rectangle, Size, Vector};
-use cosmic::iced_core::clipboard::IconSurface;
-use cosmic::iced_core::widget::{tree, Operation, Tree};
-use cosmic::iced_core::{self, layout, renderer, Clipboard, Shell};
-use cosmic::iced_runtime::core::id::Id;
+use cosmic::iced::core::clipboard::IconSurface;
+use cosmic::iced::core::widget::{tree, Operation, Tree};
+use cosmic::iced::core::{self as iced_core, layout, renderer, Clipboard, Shell};
+use cosmic::iced::core::id::Id;
 use cosmic::prelude::*;
 use cosmic::{theme, widget};
 
@@ -52,6 +52,8 @@ impl AsMimeTypes for DndIndex {
     }
 }
 
+type DragIconBuilder<'a> = Box<dyn Fn(usize, Vector) -> (Element<'static, ()>, tree::State, Vector) + 'a>;
+
 /// A drag-to-reorder list widget.
 ///
 /// Wraps a pre-built inner element (column of cards) and handles drag events
@@ -68,7 +70,7 @@ pub struct ReorderList<'a, Message> {
     on_reorder: Option<Box<dyn Fn(usize, usize) -> Message + 'a>>,
     on_finish: Option<Message>,
     on_cancel: Option<Message>,
-    drag_icon_builder: Option<Box<dyn Fn(usize, Vector) -> (Element<'static, ()>, tree::State, Vector) + 'a>>,
+    drag_icon_builder: Option<DragIconBuilder<'a>>,
 }
 
 impl<'a, Message: Clone + 'static> ReorderList<'a, Message> {
@@ -221,7 +223,7 @@ struct ReorderWidgetState {
     cached_size: Option<Size>,
 }
 
-impl<Message: Clone + 'static> cosmic::iced_core::Widget<Message, cosmic::Theme, cosmic::Renderer>
+impl<Message: Clone + 'static> cosmic::iced::core::Widget<Message, cosmic::Theme, cosmic::Renderer>
     for ReorderList<'_, Message>
 {
     fn tag(&self) -> tree::Tag {

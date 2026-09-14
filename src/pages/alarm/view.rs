@@ -39,11 +39,27 @@ impl AlarmState {
                 let time_str = Self::format_alarm_time(alarm, use_12h);
                 let id = alarm.id;
 
-                // Left side: label + time + repeat info
+                // Left side: label + time + repeat info. A pending snooze takes
+                // over the caption line: the stored hour/minute still show the
+                // original time, so without this a snoozed alarm is invisible.
+                let subtitle: Element<'_, Message> =
+                    if let Some(s) = self.snoozed.iter().find(|s| s.alarm_id == id) {
+                        widget::text::caption(fl!(
+                            "alarm-snoozed-until",
+                            time = Self::format_snooze_time(s.retrigger_at, use_12h)
+                        ))
+                        .class(cosmic::theme::Text::Color(
+                            cosmic::theme::active().cosmic().accent_color().into(),
+                        ))
+                        .into()
+                    } else {
+                        widget::text::caption(format!("{}", alarm.repeat_mode)).into()
+                    };
+
                 let left = widget::column::with_capacity(3)
                     .push(widget::text::body(&alarm.label))
                     .push(widget::text::title3(time_str))
-                    .push(widget::text::caption(format!("{}", alarm.repeat_mode)))
+                    .push(subtitle)
                     .width(Length::Fill);
 
                 // Toggle
@@ -109,7 +125,7 @@ impl AlarmState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                cosmic::iced_widget::container::Style {
+                                cosmic::iced::widget::container::Style {
                                     background: Some(cosmic::iced::Background::Color(accent)),
                                     border: cosmic::iced::Border {
                                         radius: 2.0.into(),
@@ -134,7 +150,7 @@ impl AlarmState {
                                 .size(16)
                                 .icon()
                                 .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                                    |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                                    |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                                         color: Some(theme.cosmic().palette.neutral_7.into()),
                                     },
                                 )))
@@ -179,7 +195,7 @@ impl AlarmState {
                         .padding(8)
                         .width(Length::Fill)
                         .class(cosmic::theme::Container::Custom(Box::new(move |theme| {
-                            let mut style = cosmic::iced_widget::container::Catalog::style(
+                            let mut style = cosmic::iced::widget::container::Catalog::style(
                                 theme,
                                 &cosmic::theme::Container::Primary,
                             );
@@ -216,7 +232,7 @@ impl AlarmState {
 
                 let reorder_list = ReorderList::new(cards, item_count, self.dragging_index)
                     .on_start_drag(Message::StartDrag)
-                    .on_reorder(|from, to| Message::Reorder(from, to))
+                    .on_reorder(Message::Reorder)
                     .on_finish(Message::FinishDrag)
                     .on_cancel(Message::CancelDrag)
                     .drag_icon(move |index, offset| {
@@ -253,7 +269,7 @@ impl AlarmState {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Custom(Box::new(|theme| {
                                 let accent = Color::from(theme.cosmic().accent_color());
-                                let mut style = cosmic::iced_widget::container::Catalog::style(
+                                let mut style = cosmic::iced::widget::container::Catalog::style(
                                     theme,
                                     &cosmic::theme::Container::Primary,
                                 );
@@ -266,7 +282,7 @@ impl AlarmState {
                             })))
                             .into();
 
-                        (card, cosmic::iced_core::widget::tree::State::None, offset)
+                        (card, cosmic::iced::core::widget::tree::State::None, offset)
                     });
 
                 col = col.push(reorder_list);
@@ -311,7 +327,7 @@ impl AlarmState {
             .size(128)
             .icon()
             .class(cosmic::theme::Svg::Custom(std::rc::Rc::new(
-                |theme: &cosmic::Theme| cosmic::iced_widget::svg::Style {
+                |theme: &cosmic::Theme| cosmic::iced::widget::svg::Style {
                     color: Some(theme.cosmic().palette.neutral_5.into()),
                 },
             )));
@@ -341,6 +357,20 @@ impl AlarmState {
             format!("{:02}:{:02} {}", h12, alarm.minute, period)
         } else {
             format!("{:02}:{:02}", alarm.hour, alarm.minute)
+        }
+    }
+
+    /// Format a pending snooze re-ring time, matching `format_alarm_time`'s
+    /// 12h/24h convention.
+    fn format_snooze_time(at: chrono::DateTime<chrono::Local>, use_12h: bool) -> String {
+        use chrono::Timelike;
+        let hour = at.hour() as u8;
+        if use_12h {
+            let (h12, is_pm) = hour24_to_12(hour);
+            let period = if is_pm { fl!("pm") } else { fl!("am") };
+            format!("{:02}:{:02} {}", h12, at.minute(), period)
+        } else {
+            format!("{:02}:{:02}", hour, at.minute())
         }
     }
 

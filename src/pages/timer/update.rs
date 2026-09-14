@@ -156,6 +156,16 @@ impl TimerState {
             }
             Message::DeleteTimer(id) => {
                 self.timers.retain(|t| t.id != id);
+                // Never leave focus mode pointing at a deleted timer.
+                if self.focused_id == Some(id) {
+                    self.focused_id = None;
+                }
+            }
+            Message::Focus(id) => {
+                self.focused_id = Some(id);
+            }
+            Message::Unfocus => {
+                self.focused_id = None;
             }
             Message::ToggleEditMode => {
                 self.edit_mode = !self.edit_mode;

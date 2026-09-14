@@ -3,20 +3,36 @@
 mod dialogs;
 mod helpers;
 mod lifecycle;
-mod persistence;
+pub mod persistence;
 mod subscriptions;
 
 use crate::config::Config;
 use crate::pages::ContextPage;
-use crate::pages::{alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
-use cosmic::cosmic_config;
+use crate::pages::{alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks};
 use cosmic::widget::{about::About, menu, nav_bar, toaster};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../../resources/icons/hicolor/scalable/apps/icon.svg");
+/// Timer and Pomodoro have no reliable freedesktop symbolic icon (`timer-symbolic`
+/// is absent from most themes), so both are bundled and loaded from bytes.
+pub(crate) const TIMER_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/timer-symbolic.svg");
+pub(crate) const POMODORO_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/pomodoro-symbolic.svg");
+pub(crate) const COUNTDOWN_ICON: &[u8] =
+    include_bytes!("../../resources/icons/hicolor/scalable/apps/countdown-symbolic.svg");
+
+/// Build a themed icon handle from bundled SVG bytes.
+///
+/// `icon::from_svg_bytes` leaves `symbolic: false`, which stops libcosmic from
+/// recolouring the glyph for the active theme — it would render black on dark
+/// backgrounds. Setting the flag opts the icon into theme tinting.
+pub(crate) fn bundled_icon(bytes: &'static [u8]) -> cosmic::widget::icon::Handle {
+    let mut handle = cosmic::widget::icon::from_svg_bytes(bytes);
+    handle.symbolic = true;
+    handle
+}
 
 // --- Destructive action confirmation ---
 
@@ -48,8 +64,34 @@ pub struct AppModel {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     config: Config,
     config_context: Option<cosmic_config::Config>,
+    /// The stored preference. Persisted as-is so choosing System survives.
+    time_format: crate::time_format::TimeFormat,
+    /// `time_format` resolved to a concrete flag, recomputed whenever the
+    /// setting changes. Kept separate so the resolved value is never written
+    /// back over the stored preference.
     use_12h: bool,
     show_shortcuts_dialog: bool,
+    /// Sidebar order and hidden set. Persisted by page key, never by
+    /// `nav_bar::Entity` - those go stale the moment the model is rebuilt.
+    nav_order: Vec<crate::pages::Page>,
+    nav_hidden: Vec<crate::pages::Page>,
+    /// Last runtime state seen from the daemon. Holds the wall-clock deadlines
+    /// the tick renders from, so the countdown stays smooth without a D-Bus
+    /// round-trip per frame.
+    runtime: crate::runtime::RuntimeState,
+    /// Whether the settings page is showing. Session-only.
+    ///
+    /// A page rather than a nav entry: the sidebar list is user-reorderable and
+    /// hideable, so putting Settings in it would let someone hide the only route
+    /// to it.
+    show_settings: bool,
+    /// Drag state for reordering the sidebar. Works because settings is a page
+    /// in `view()` -- drag inside a context drawer is silently inert.
+    nav_dragging: Option<usize>,
+    nav_pre_drag: Vec<crate::pages::Page>,
+    /// Quick-action palette state (session-only).
+    show_palette: bool,
+    palette_input: String,
 
     // Confirmation dialog state
     pending_destructive_action: Option<DestructiveAction>,
@@ -73,13 +115,11 @@ pub struct AppModel {
     pomodoro: pomodoro::PomodoroState,
     chess: chess::ChessState,
     workout: workout::WorkoutState,
+    countdown: countdown::CountdownState,
 
     // Last-active item IDs for keyboard shortcut targeting (session-only, not persisted)
     active_timer_id: Option<u32>,
     active_pomodoro_id: Option<u32>,
-
-    // Audio stop handles for ringing alarms
-    alarm_audio_stops: HashMap<u32, Arc<AtomicBool>>,
 
     // Toast notifications
     toasts: toaster::Toasts<Message>,
@@ -100,8 +140,9 @@ pub enum Message {
     Pomodoro(pomodoro::Message),
     Chess(chess::Message),
     Workout(workout::Message),
+    Countdown(countdown::Message),
     CustomSoundSelected(CustomSoundTarget, String),
-    SetTimeFormat(bool),
+    SetTimeFormat(crate::time_format::TimeFormat),
     // Keyboard shortcuts
     Quit,
     NavigateNext,
@@ -114,6 +155,25 @@ pub enum Message {
     PageShortcutSkip,
     ShowShortcutsDialog,
     CloseShortcutsDialog,
+    // Quick-action palette
+    OpenPalette,
+    ClosePalette,
+    PaletteInput(String),
+    PaletteSubmit,
+    PaletteRun(crate::quick_action::QuickAction),
+    // Sidebar customisation
+    ToggleNavPage(crate::pages::Page, bool),
+    ShowSettings,
+    /// Ask the desktop to launch the daemon at login. Inside a Flatpak this
+    /// goes through the Background portal and prompts, hence user-initiated.
+    EnableAutostart,
+    AutostartResult(bool),
+    NavStartDrag(usize),
+    NavReorder(usize, usize),
+    NavFinishDrag,
+    NavCancelDrag,
+    /// The daemon's runtime state changed: something started or stopped ringing.
+    UpdateRuntime(crate::runtime::RuntimeState),
     // Confirmation dialogs
     ConfirmDestructiveAction,
     CancelDestructiveAction,
@@ -135,6 +195,7 @@ pub enum CustomSoundTarget {
     Timer,
     Pomodoro,
     Workout,
+    Countdown,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -142,6 +203,7 @@ pub enum MenuAction {
     About,
     Settings,
     Shortcuts,
+    QuickAction,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -150,8 +212,9 @@ impl menu::action::MenuAction for MenuAction {
     fn message(&self) -> Self::Message {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
-            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
+            MenuAction::Settings => Message::ShowSettings,
             MenuAction::Shortcuts => Message::ShowShortcutsDialog,
+            MenuAction::QuickAction => Message::OpenPalette,
         }
     }
 }

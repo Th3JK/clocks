@@ -3,7 +3,7 @@
 // Circular progress indicator using iced Canvas.
 
 use cosmic::iced::{self, mouse, Color, Length, Rectangle};
-use cosmic::iced_widget::canvas::{self, Frame, Path, Stroke};
+use cosmic::iced::widget::canvas::{self, Frame, Path, Stroke};
 use cosmic::prelude::*;
 use std::f32::consts::PI;
 
@@ -51,7 +51,7 @@ impl CircularProgress {
 
     pub fn view<M: 'static>(self) -> Element<'static, M> {
         let size = self.size;
-        cosmic::iced_widget::Canvas::<Self, M, cosmic::Theme, cosmic::Renderer>::new(self)
+        cosmic::iced::widget::Canvas::<Self, M, cosmic::Theme, cosmic::Renderer>::new(self)
             .width(Length::Fixed(size))
             .height(Length::Fixed(size))
             .into()

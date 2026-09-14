@@ -14,7 +14,16 @@ impl PomodoroState {
 
         match message {
             Message::OpenSettings => {
-                // Handled in app.rs
+                // Opening the drawer always means "create new". Without clearing
+                // `editing_id` here, opening it after an edit (e.g. dismissing the
+                // drawer with the header X, which touches no page state) reopens
+                // that timer's edit form, and saving silently overwrites it.
+                self.editing_id = None;
+                self.edit_label.clear();
+                self.edit_work_minutes = self.default_work_minutes;
+                self.edit_short_break_minutes = self.default_short_break_minutes;
+                self.edit_long_break_minutes = self.default_long_break_minutes;
+                self.edit_sound = "Bell".to_string();
             }
             Message::Start(id) => {
                 if let Some(timer) = self.timers.iter_mut().find(|t| t.id == id) {
@@ -60,6 +69,21 @@ impl PomodoroState {
             }
             Message::Delete(id) => {
                 self.timers.retain(|t| t.id != id);
+                // Don't leave the drawer bound to a timer that no longer exists.
+                if self.editing_id == Some(id) {
+                    self.editing_id = None;
+                    self.edit_label.clear();
+                }
+                // Nor focus mode.
+                if self.focused_id == Some(id) {
+                    self.focused_id = None;
+                }
+            }
+            Message::Focus(id) => {
+                self.focused_id = Some(id);
+            }
+            Message::Unfocus => {
+                self.focused_id = None;
             }
             Message::AddTimer => {
                 let label = if self.edit_label.is_empty() {
@@ -67,13 +91,16 @@ impl PomodoroState {
                 } else {
                     self.edit_label.clone()
                 };
-                self.timers.push(PomodoroTimer::new(
+                let mut timer = PomodoroTimer::new(
                     self.next_id,
                     label,
                     self.default_work_minutes,
                     self.default_short_break_minutes,
                     self.default_long_break_minutes,
-                ));
+                );
+                // `PomodoroTimer::new` hardcodes "Bell"; honour the chosen sound.
+                timer.sound = self.edit_sound.clone();
+                self.timers.push(timer);
                 self.next_id += 1;
                 self.edit_label.clear();
             }

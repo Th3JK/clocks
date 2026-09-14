@@ -2,6 +2,7 @@ app-title = Clocks
 about = About
 settings = Settings
 repository = Repository
+report-issue = Report an issue
 view = View
 
 # Navigation
@@ -22,14 +23,16 @@ start = Start
 pause = Pause
 resume = Resume
 reset = Reset
+notification-open = Open Clocks
 dismiss = Dismiss
 snooze = Snooze
 add = Add
 
 # Settings
 time-format = Time Format
+time-format-system = System
 time-format-24h = 24-hour
-time-format-12h = 12-hour (AM/PM)
+time-format-12h = 12-hour
 
 # Tooltips
 tooltip-add = Add
@@ -111,6 +114,7 @@ alarm-ringing = Alarm: { $label }
 ringing = Ringing...
 alarm-label-placeholder = Alarm label
 alarm-default-label = Alarm
+alarm-snoozed-until = Snoozed until { $time }
 once = Once
 every-day = Every Day
 select-specific-days = Or select specific days:
@@ -180,6 +184,17 @@ pomodoro-transition = { $label }: { $prev } complete! Starting { $next }
 pomodoro-settings = Pomodoro Settings
 
 # Shortcuts
+palette-title = Quick action
+palette-placeholder = e.g. 5m timer, alarm 6:30, clock tokyo
+palette-hint = Type a duration, a time, or a page name
+palette-no-match = Nothing matches that
+palette-run = Run
+palette-preview-timer = Start a { $duration } timer { $label }
+palette-preview-alarm = Set an alarm for { $time } { $label }
+palette-preview-countdown = Add a countdown to { $date } { $label }
+palette-preview-clock = Add a world clock for "{ $query }"
+palette-preview-navigate = Go to { $page }
+palette-preview-start = Start { $label }
 shortcuts = Shortcuts
 shortcuts-description = Keyboard shortcuts available in this application
 shortcuts-close = Close
@@ -190,13 +205,23 @@ shortcuts-next-tab = Next tab
 shortcuts-prev-tab = Previous tab
 shortcuts-tabs = Tabs
 shortcuts-show-shortcuts = Show shortcuts
+shortcuts-quick-action = Quick action
 shortcuts-start-pause = Start / Pause
 shortcuts-lap = Lap (Stopwatch)
 shortcuts-reset = Reset
 shortcuts-new-item = New item
 shortcuts-skip-break = Skip break (Pomodoro)
+shortcuts-chess-switch = Switch clock (Chess)
 
 # Settings — world clocks section
+settings-section-background = Background
+settings-background-description = Alarms and timers ring even when Clocks is closed, as long as the background service starts with your session
+autostart-enable = Start automatically
+autostart-already-enabled = Starts automatically with your session
+autostart-enabled = Clocks will now start with your session
+autostart-denied = Permission was not granted
+settings-section-sidebar = Sidebar
+settings-sidebar-description = Drag to reorder pages, or switch one off to hide it
 settings-section-world-clocks = World Clocks
 settings-auto-sort-world-clocks = Automatically sort by timezone offset
 
@@ -246,6 +271,13 @@ chess-white = White
 chess-black = Black
 chess-turn = { $player } to move
 chess-paused = Paused
+chess-move-number = #
+chess-time-control = { $base }+{ $increment }
+chess-press-to-start = { $player } to move — press a clock or Space to start
+chess-moves = { $moves } moves
+chess-moves-last = { $moves } moves · last { $seconds }s
+chess-lost-on-time = Lost on time
+chess-won = Wins on time
 chess-flagged = { $player } ran out of time
 chess-winner = { $player } wins on time
 chess-presets = Presets
@@ -268,8 +300,8 @@ workout-set-rest = SET BREAK
 workout-done = DONE
 workout-preset-tabata = Tabata
 workout-preset-hiit = HIIT
-workout-status = { $phase } · Round { $round }/{ $rounds } · Set { $set }/{ $sets }
-workout-summary = { $work }s work / { $rest }s rest × { $rounds }
+workout-status-blocks = { $step } · Block { $block }/{ $blocks } · Round { $rep }/{ $reps }
+workout-summary = { $blocks } blocks · { $total }
 workout-default-label = Workout { $id }
 workout-complete = { $label } complete
 workout-phase = { $label }: { $phase }
@@ -284,5 +316,50 @@ workout-rounds-label = Rounds
 workout-sets-label = Sets
 workout-set-rest-label = Set break
 workout-add = Add Workout
+workout-total-duration = Total { $total }
+workout-skip-last-recovery = Skip final recovery
+workout-repeat = Repeat
+workout-block-n = Block { $n }
+workout-add-step = Add step
+workout-add-block = Add block
+workout-edit-blocks-title = Edit: { $label }
+workout-edit-blocks = Edit blocks…
+workout-kind-recovery = Recovery
+workout-kind-effort = Effort
+workout-kind-prep = Prep
 create-workout = Create workout
 notification-workout = Workout
+
+# Countdown to events
+nav-countdown = Countdown
+countdown-title = Countdown
+countdown-edit = Edit Event
+countdown-new = New Event
+countdown-add = Add Event
+countdown-label-placeholder = Event name (e.g. Launch day)
+countdown-pick-date = Pick a date
+countdown-default-label = Event { $id }
+create-countdown = Create Event
+countdown-yearly = Yearly
+countdown-yearly-label = Repeat every year
+countdown-reminders = Remind me before
+countdown-reminder-5min = 5 minutes before
+countdown-reminder-15min = 15 minutes before
+countdown-reminder-1hour = 1 hour before
+countdown-reminder-1day = 1 day before
+countdown-reminder-1week = 1 week before
+countdown-reminder-count = { $count ->
+    [one] { $count } reminder
+   *[other] { $count } reminders
+}
+countdown-reminder-body = { $label } — { $when }
+countdown-arrived = { $label } is here
+countdown-dhms = { $days }d { $hours }h { $minutes }m { $seconds }s
+countdown-ago = { $when } (passed)
+countdown-passed = Passed
+countdown-edit = Edit event
+countdown-days = { $days ->
+    [one] { $days } day
+   *[other] { $days } days
+}
+notification-countdown = Countdown

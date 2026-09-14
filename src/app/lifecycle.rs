@@ -2,8 +2,10 @@
 //
 // Implements the `cosmic::Application` trait for `AppModel`.
 
+use std::time::Duration;
+
 use super::persistence::{
-    restore_alarms, restore_chess, restore_pomodoros, restore_stopwatch_history, restore_timers,
+    restore_alarms, restore_chess, restore_countdowns, restore_nav, restore_pomodoros, restore_stopwatch_history, restore_timers,
     restore_workouts, restore_world_clocks,
 };
 use super::subscriptions::{
@@ -16,21 +18,36 @@ use super::{
 use cosmic::widget::toaster;
 use crate::config::Config;
 use crate::fl;
-use crate::pages::{ContextPage, Page, alarm, chess, pomodoro, stopwatch, timer, workout, world_clocks};
+use crate::pages::{
+    ContextPage, Page, alarm, chess, countdown, pomodoro, stopwatch, timer, workout, world_clocks,
+};
 use cosmic::app::context_drawer;
-use cosmic::cosmic_config::{self, CosmicConfigEntry};
+use cosmic_config::CosmicConfigEntry;
 use cosmic::iced::Length;
 use cosmic::iced::Subscription;
-use cosmic::iced_futures::event::listen_raw;
+use cosmic::iced::event::listen_raw;
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::prelude::*;
 use std::collections::HashMap;
 
 // --- Application trait (View + Update lifecycle) ---
 
+/// Send a command to the daemon without waiting for it.
+///
+/// Blocking zbus on a detached thread rather than a `Task`: the GUI does not
+/// need the result, because the state change comes back through the runtime
+/// watcher. Doing it inline would block the event loop on a D-Bus round-trip.
+fn daemon_call(call: impl FnOnce() -> Result<(), zbus::Error> + Send + 'static) {
+    std::thread::spawn(move || {
+        if let Err(e) = call() {
+            eprintln!("clocks: could not reach the daemon: {e}");
+        }
+    });
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
-    type Flags = ();
+    type Flags = crate::flags::Flags;
     type Message = Message;
 
     const APP_ID: &'static str = "dev.th3jk.clocks";
@@ -45,52 +62,27 @@ impl cosmic::Application for AppModel {
 
     fn init(
         core: cosmic::Core,
-        _flags: Self::Flags,
+        flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        let mut nav = nav_bar::Model::default();
-
-        nav.insert()
-            .text(fl!("nav-world-clocks"))
-            .data::<Page>(Page::WorldClocks)
-            .icon(icon::from_name("preferences-system-time-symbolic"))
-            .activate();
-
-        nav.insert()
-            .text(fl!("nav-stopwatch"))
-            .data::<Page>(Page::Stopwatch)
-            .icon(icon::from_name("media-playback-start-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-alarm"))
-            .data::<Page>(Page::Alarm)
-            .icon(icon::from_name("alarm-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-timer"))
-            .data::<Page>(Page::Timer)
-            .icon(icon::from_name("appointment-soon-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-pomodoro"))
-            .data::<Page>(Page::Pomodoro)
-            .icon(icon::from_name("appointment-soon-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-chess"))
-            .data::<Page>(Page::Chess)
-            .icon(icon::from_name("view-grid-symbolic"));
-
-        nav.insert()
-            .text(fl!("nav-workout"))
-            .data::<Page>(Page::Workout)
-            .icon(icon::from_name("emblem-favorite-symbolic"));
+        // Populated by `rebuild_nav` once the stored order is known.
+        let nav = nav_bar::Model::default();
 
         let about = About::default()
             .name(fl!("app-title"))
             .icon(widget::icon::from_svg_bytes(APP_ICON))
             .version(env!("CARGO_PKG_VERSION"))
-            .links([(fl!("repository"), REPOSITORY)])
-            .license(env!("CARGO_PKG_LICENSE"));
+            // `links` replaces rather than appends, so both entries go in one
+            // call. The tuple is (label, url) — the contributor setters are not
+            // an option here, as they rewrite their second element as `mailto:`.
+            .links([
+                (fl!("repository"), REPOSITORY.to_string()),
+                (fl!("report-issue"), format!("{REPOSITORY}/issues")),
+            ])
+            .license(env!("CARGO_PKG_LICENSE"))
+            // Without a URL the about widget still wires `on_press`, so the
+            // license row was clickable and fired `LaunchUrl("")`.
+            .license_url(format!("{REPOSITORY}/blob/main/LICENSE"))
+            .comments(env!("CARGO_PKG_DESCRIPTION"));
 
         let config_context = cosmic_config::Config::new(Self::APP_ID, Config::VERSION).ok();
         let config = config_context
@@ -109,8 +101,11 @@ impl cosmic::Application for AppModel {
         let stopwatch = restore_stopwatch_history(&config);
         let chess = restore_chess(&config);
         let workout = restore_workouts(&config);
+        let countdown = restore_countdowns(&config);
+        let (nav_order, nav_hidden) = restore_nav(&config);
 
-        let use_12h = config.use_12h;
+        let time_format = config.time_format;
+        let use_12h = time_format.use_12h();
         let confirm_delete_alarm = config.confirm_delete_alarm;
         let confirm_delete_timer = config.confirm_delete_timer;
         let confirm_delete_world_clock = config.confirm_delete_world_clock;
@@ -125,11 +120,20 @@ impl cosmic::Application for AppModel {
             context_page: ContextPage::default(),
             about,
             nav,
-            key_binds: HashMap::new(),
+            key_binds: key_binds(),
             config,
             config_context,
+            time_format,
             use_12h,
             show_shortcuts_dialog: false,
+            nav_order,
+            nav_hidden,
+            show_settings: false,
+            nav_dragging: None,
+            nav_pre_drag: Vec::new(),
+            runtime: crate::runtime::RuntimeState::default(),
+            show_palette: false,
+            palette_input: String::new(),
             pending_destructive_action: None,
             confirm_dialog_dont_show_again: false,
             confirm_delete_alarm,
@@ -147,11 +151,28 @@ impl cosmic::Application for AppModel {
             pomodoro,
             chess,
             workout,
+            countdown,
             active_timer_id: None,
             active_pomodoro_id: None,
-            alarm_audio_stops: HashMap::new(),
             toasts: toaster::Toasts::new(Message::CloseToast),
         };
+
+        app.rebuild_nav();
+
+        // Bring the daemon up if it is not already running: this call is what
+        // D-Bus activation hangs off, so alarms work while the app is open even
+        // when autostart was never granted.
+        std::thread::spawn(|| {
+            if let Err(e) = crate::ipc::reload() {
+                eprintln!("clocks: background daemon unavailable: {e}");
+            }
+        });
+
+        // Launched with a page to show -- e.g. by clicking an alarm
+        // notification while the app was closed.
+        if let Some(page) = flags.page {
+            app.activate_page(page);
+        }
 
         if app.auto_sort_alarms {
             app.sort_alarms();
@@ -168,19 +189,30 @@ impl cosmic::Application for AppModel {
 
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            widget::button::custom(widget::text(fl!("view")))
+            // The system glyph rather than a bundled one: this sits next to the
+            // nav-bar toggle, and only the real icon matches its weight.
+            widget::button::custom(icon::from_name("open-menu-symbolic").size(16).icon())
                 .padding([4, 12])
                 .class(cosmic::theme::Button::MenuRoot)
                 .apply(Element::from),
             menu::items(
                 &self.key_binds,
                 vec![
+                    menu::Item::Button(fl!("palette-title"), None, MenuAction::QuickAction),
                     menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
                     menu::Item::Button(fl!("shortcuts"), None, MenuAction::Shortcuts),
                     menu::Item::Button(fl!("about"), None, MenuAction::About),
                 ],
             ),
         )]);
+
+        // `MenuBar` defaults to `ItemWidth::Uniform(150)`, which ignores each
+        // tree's own width outright -- that 150 is the cramped dropdown. Setting
+        // it here is what actually widens the menu; `MenuTree::width` is only
+        // consulted under `ItemWidth::Static`.
+        let menu_bar = menu_bar
+            .item_width(menu::ItemWidth::Uniform(260))
+            .item_height(menu::ItemHeight::Uniform(36));
 
         vec![menu_bar.into()]
     }
@@ -234,11 +266,18 @@ impl cosmic::Application for AppModel {
                 )
                 .title(title)
             }
-            ContextPage::PomodoroSettings => context_drawer::context_drawer(
-                self.pomodoro.settings_view().map(Message::Pomodoro),
-                Message::ToggleContextPage(ContextPage::PomodoroSettings),
-            )
-            .title(fl!("pomodoro-settings")),
+            ContextPage::PomodoroSettings => {
+                let title = if self.pomodoro.editing_id.is_some() {
+                    fl!("edit-pomodoro")
+                } else {
+                    fl!("new-pomodoro")
+                };
+                context_drawer::context_drawer(
+                    self.pomodoro.settings_view().map(Message::Pomodoro),
+                    Message::ToggleContextPage(ContextPage::PomodoroSettings),
+                )
+                .title(title)
+            }
             ContextPage::ChessSettings => context_drawer::context_drawer(
                 self.chess.settings_view().map(Message::Chess),
                 Message::ToggleContextPage(ContextPage::ChessSettings),
@@ -256,15 +295,30 @@ impl cosmic::Application for AppModel {
                 )
                 .title(title)
             }
-            ContextPage::Settings => context_drawer::context_drawer(
-                self.settings_view(),
-                Message::ToggleContextPage(ContextPage::Settings),
-            )
-            .title(fl!("settings")),
+            ContextPage::CountdownEdit => {
+                let title = if self.countdown.editing_id.is_some() {
+                    fl!("countdown-edit")
+                } else {
+                    fl!("countdown-new")
+                };
+                context_drawer::context_drawer(
+                    self.countdown.settings_view(self.use_12h).map(Message::Countdown),
+                    Message::ToggleContextPage(ContextPage::CountdownEdit),
+                )
+                .title(title)
+            }
         })
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
+        if self.show_settings {
+            let page = widget::container(self.settings_page())
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(16);
+            return toaster::toaster(&self.toasts, page).into();
+        }
+
         let content: Element<_> = match self.nav.active_data::<Page>() {
             Some(Page::WorldClocks) => self
                 .world_clocks
@@ -276,6 +330,7 @@ impl cosmic::Application for AppModel {
             Some(Page::Pomodoro) => self.pomodoro.view().map(Message::Pomodoro),
             Some(Page::Chess) => self.chess.view().map(Message::Chess),
             Some(Page::Workout) => self.workout.view().map(Message::Workout),
+            Some(Page::Countdown) => self.countdown.view(self.use_12h).map(Message::Countdown),
             None => widget::text::body(fl!("select-a-view")).into(),
         };
 
@@ -306,6 +361,10 @@ impl cosmic::Application for AppModel {
             return Some(dialog.into());
         }
 
+        if self.show_palette {
+            return Some(self.palette_view());
+        }
+
         if self.pending_destructive_action.is_some() {
             return Some(self.confirmation_dialog_view());
         }
@@ -324,7 +383,29 @@ impl cosmic::Application for AppModel {
                 .map(|update| Message::UpdateConfig(update.config)),
         ];
 
-        subscriptions.push(Subscription::run(tick_subscription));
+        // The daemon's half of the split. Same mechanism as the config watcher
+        // above, so ringing and snooze changes arrive without a D-Bus client.
+        subscriptions.push(
+            self.core()
+                .watch_state::<crate::runtime::RuntimeState>(Self::APP_ID)
+                .map(|update| Message::UpdateRuntime(update.config)),
+        );
+        // Adaptive, because an idle window has nothing to redraw. The stopwatch
+        // shows hundredths and so genuinely needs the rate; everything else
+        // displays to the second.
+        let tick_rate = if self.stopwatch.is_running {
+            Duration::from_millis(16)
+        } else if !self.runtime.timers.is_empty()
+            || !self.runtime.pomodoro.is_empty()
+            || self.chess.is_running()
+            || self.workout.has_running()
+            || self.countdown.has_pending()
+        {
+            Duration::from_millis(500)
+        } else {
+            Duration::from_millis(1000)
+        };
+        subscriptions.push(tick_subscription(tick_rate));
         subscriptions.push(listen_raw(input_subscription));
 
         Subscription::batch(subscriptions)
@@ -337,8 +418,19 @@ impl cosmic::Application for AppModel {
             message,
             Message::Tick
                 | Message::UpdateConfig(_)
+                | Message::UpdateRuntime(_)
+                // Fires per drag-motion event; the order is saved on finish.
+                | Message::NavStartDrag(_)
+                | Message::NavReorder(..)
+                | Message::NavCancelDrag
+                | Message::ShowSettings
+                | Message::EnableAutostart
+                | Message::AutostartResult(_)
                 | Message::CloseShortcutsDialog
                 | Message::ShowShortcutsDialog
+                | Message::OpenPalette
+                | Message::ClosePalette
+                | Message::PaletteInput(_)
                 | Message::CancelDestructiveAction
                 | Message::ToggleConfirmDontShowAgain(_)
                 | Message::CloseToast(_)
@@ -417,8 +509,14 @@ impl cosmic::Application for AppModel {
                 alarm::Message::SaveAlarm => {
                     self.alarm.update(msg.clone(), self.use_12h);
                     self.core.window.show_context = false;
-                    // Show toast for newly created alarm (enabled by default)
-                    if let Some(alarm) = self.alarm.alarms.last() {
+                    // Toast the alarm that was actually saved. Using the last list
+                    // entry breaks when editing, and auto-sort may reorder the list
+                    // during the save, making the position arbitrary.
+                    if let Some(alarm) = self
+                        .alarm
+                        .last_saved_id
+                        .and_then(|id| self.alarm.alarms.iter().find(|a| a.id == id))
+                    {
                         if alarm.is_enabled {
                             let alarm = alarm.clone();
                             let task = self.push_alarm_toast(&alarm);
@@ -430,15 +528,17 @@ impl cosmic::Application for AppModel {
                 alarm::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Alarm);
                 }
+                // The daemon owns ringing, so these are requests rather than
+                // state changes. Fire and forget on a thread -- the resulting
+                // state arrives back through the runtime watcher, which is also
+                // what stops the audio. Doing it here as well would race.
                 alarm::Message::SnoozeAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone(), self.use_12h);
+                    daemon_call(move || crate::ipc::snooze(alarm_id));
                 }
                 alarm::Message::DismissAlarm(alarm_id) => {
                     let alarm_id = *alarm_id;
-                    self.stop_alarm_audio(alarm_id);
-                    self.alarm.update(msg.clone(), self.use_12h);
+                    daemon_call(move || crate::ipc::dismiss(alarm_id));
                 }
                 _ => {
                     self.alarm.update(msg.clone(), self.use_12h);
@@ -446,13 +546,40 @@ impl cosmic::Application for AppModel {
             },
 
             Message::Timer(ref msg) => match msg {
+                // The daemon owns running timers, so these are requests rather
+                // than state changes -- it is what keeps a timer counting down
+                // with the window closed. The resulting state comes back
+                // through the runtime watcher.
+                timer::Message::StartTimer(id) => {
+                    let id = *id;
+                    // Keyboard shortcuts act on the last timer touched.
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_start(id));
+                }
+                timer::Message::PauseTimer(id) => {
+                    let id = *id;
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_pause(id));
+                }
+                timer::Message::ResumeTimer(id) => {
+                    let id = *id;
+                    self.active_timer_id = Some(id);
+                    daemon_call(move || crate::ipc::timer_resume(id));
+                }
+                timer::Message::ResetTimer(id) => {
+                    let id = *id;
+                    daemon_call(move || crate::ipc::timer_reset(id));
+                }
                 timer::Message::DeleteTimer(id) => {
+                    let id = *id;
                     if self.confirm_delete_timer && self.pending_destructive_action.is_none() {
-                        let id = *id;
                         self.pending_destructive_action = Some(DestructiveAction::DeleteTimer(id));
                         self.confirm_dialog_dont_show_again = false;
                         return Task::none();
                     }
+                    // Only once the delete is actually going ahead: stop it
+                    // counting down before the definition it refers to is gone.
+                    daemon_call(move || crate::ipc::timer_reset(id));
                     self.timer.update(msg.clone());
                     if self.context_page == ContextPage::TimerAdd {
                         self.timer.editing = false;
@@ -471,19 +598,16 @@ impl cosmic::Application for AppModel {
                 }
                 timer::Message::CancelEdit | timer::Message::SaveTimer => {
                     if matches!(msg, timer::Message::SaveTimer) {
-                        // Track the newly saved timer as active
-                        if let Some(t) = self.timer.timers.last() {
-                            self.active_timer_id = Some(t.id);
-                        }
+                        // Track the saved timer as active. When editing, that is
+                        // `edit_id`; only a freshly created timer is the last one.
+                        let edited = self.timer.edit_id;
+                        self.timer.update(msg.clone());
+                        self.active_timer_id =
+                            edited.or_else(|| self.timer.timers.last().map(|t| t.id));
+                    } else {
+                        self.timer.update(msg.clone());
                     }
-                    self.timer.update(msg.clone());
                     self.core.window.show_context = false;
-                }
-                timer::Message::StartTimer(id)
-                | timer::Message::PauseTimer(id)
-                | timer::Message::ResumeTimer(id) => {
-                    self.active_timer_id = Some(*id);
-                    self.timer.update(msg.clone());
                 }
                 timer::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Timer);
@@ -545,13 +669,15 @@ impl cosmic::Application for AppModel {
 
             Message::Pomodoro(ref msg) => match msg {
                 pomodoro::Message::Delete(id) => {
+                    let id = *id;
                     if self.confirm_delete_pomodoro && self.pending_destructive_action.is_none() {
-                        let id = *id;
                         self.pending_destructive_action =
                             Some(DestructiveAction::DeletePomodoro(id));
                         self.confirm_dialog_dont_show_again = false;
                         return Task::none();
                     }
+                    // Stop it running before the definition it refers to is gone.
+                    daemon_call(move || crate::ipc::pomodoro_reset(id));
                     self.pomodoro.update(msg.clone());
                 }
                 pomodoro::Message::OpenSettings | pomodoro::Message::StartEditPomodoro(_) => {
@@ -564,21 +690,50 @@ impl cosmic::Application for AppModel {
                     self.save_state();
                     return widget::text_input::focus(widget::Id::new("pomodoro-label-input"));
                 }
-                pomodoro::Message::CancelEditPomodoro | pomodoro::Message::SaveEditPomodoro => {
-                    if matches!(msg, pomodoro::Message::SaveEditPomodoro)
+                pomodoro::Message::CancelEditPomodoro
+                | pomodoro::Message::SaveEditPomodoro
+                | pomodoro::Message::AddTimer => {
+                    // The saved timer is the one being edited, not the last in the
+                    // list. `AddTimer` appends, so there `last()` is correct.
+                    if matches!(msg, pomodoro::Message::SaveEditPomodoro) {
+                        self.active_pomodoro_id = self.pomodoro.editing_id;
+                    }
+                    self.pomodoro.update(msg.clone());
+                    if matches!(msg, pomodoro::Message::AddTimer)
                         && let Some(p) = self.pomodoro.timers.last()
                     {
                         self.active_pomodoro_id = Some(p.id);
                     }
-                    self.pomodoro.update(msg.clone());
+                    // Close the drawer on every terminal action. `AddTimer`
+                    // previously fell through to the catch-all and left it open.
                     self.core.window.show_context = false;
                 }
-                pomodoro::Message::Start(id)
-                | pomodoro::Message::Pause(id)
-                | pomodoro::Message::Resume(id)
-                | pomodoro::Message::Skip(id) => {
-                    self.active_pomodoro_id = Some(*id);
-                    self.pomodoro.update(msg.clone());
+                // The daemon owns the running session, so these are requests.
+                // It advances work -> break -> work on its own, which is what
+                // keeps a pomodoro cycling with the window closed.
+                pomodoro::Message::Start(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_start(id));
+                }
+                pomodoro::Message::Pause(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_pause(id));
+                }
+                pomodoro::Message::Resume(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_resume(id));
+                }
+                pomodoro::Message::Skip(id) => {
+                    let id = *id;
+                    self.active_pomodoro_id = Some(id);
+                    daemon_call(move || crate::ipc::pomodoro_skip(id));
+                }
+                pomodoro::Message::Reset(id) => {
+                    let id = *id;
+                    daemon_call(move || crate::ipc::pomodoro_reset(id));
                 }
                 pomodoro::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Pomodoro);
@@ -619,6 +774,13 @@ impl cosmic::Application for AppModel {
                     self.workout.update(msg.clone());
                     self.core.window.show_context = false;
                 }
+                workout::Message::OpenBlockEditor(_) => {
+                    // The block editor owns the whole page, so close the drawer
+                    // behind it rather than leaving both open.
+                    self.workout.update(msg.clone());
+                    self.core.window.show_context = false;
+                    self.save_state();
+                }
                 workout::Message::BrowseCustomSound => {
                     return open_sound_file_dialog(CustomSoundTarget::Workout);
                 }
@@ -627,6 +789,31 @@ impl cosmic::Application for AppModel {
                 }
                 _ => {
                     self.workout.update(msg.clone());
+                }
+            },
+
+            Message::Countdown(ref msg) => match msg {
+                countdown::Message::OpenSettings | countdown::Message::StartEditEvent(_) => {
+                    self.countdown.update(msg.clone());
+                    self.context_page = ContextPage::CountdownEdit;
+                    self.core.window.show_context = true;
+                    self.save_state();
+                    return widget::text_input::focus(widget::Id::new("countdown-label-input"));
+                }
+                countdown::Message::CancelEdit
+                | countdown::Message::SaveEditEvent
+                | countdown::Message::AddEvent => {
+                    self.countdown.update(msg.clone());
+                    self.core.window.show_context = false;
+                }
+                countdown::Message::BrowseCustomSound => {
+                    return open_sound_file_dialog(CustomSoundTarget::Countdown);
+                }
+                countdown::Message::Tick => {
+                    // Handled in handle_tick
+                }
+                _ => {
+                    self.countdown.update(msg.clone());
                 }
             },
 
@@ -640,7 +827,8 @@ impl cosmic::Application for AppModel {
             }
 
             Message::UpdateConfig(config) => {
-                self.use_12h = config.use_12h;
+                self.time_format = config.time_format;
+                self.use_12h = self.time_format.use_12h();
                 self.confirm_delete_alarm = config.confirm_delete_alarm;
                 self.confirm_delete_timer = config.confirm_delete_timer;
                 self.confirm_delete_world_clock = config.confirm_delete_world_clock;
@@ -666,10 +854,14 @@ impl cosmic::Application for AppModel {
                 CustomSoundTarget::Workout => {
                     self.workout.update(workout::Message::EditSound(path));
                 }
+                CustomSoundTarget::Countdown => {
+                    self.countdown.update(countdown::Message::EditSound(path));
+                }
             },
 
-            Message::SetTimeFormat(use_12h) => {
-                self.use_12h = use_12h;
+            Message::SetTimeFormat(format) => {
+                self.time_format = format;
+                self.use_12h = format.use_12h();
             }
 
             Message::Quit => {
@@ -728,8 +920,253 @@ impl cosmic::Application for AppModel {
                 self.core.window.show_context = false;
             }
 
-            Message::CloseShortcutsDialog => {
+            Message::ToggleNavPage(page, visible) => {
+                if visible {
+                    self.nav_hidden.retain(|p| *p != page);
+                } else if !self.nav_hidden.contains(&page) {
+                    // Refuse to hide the last page: an empty sidebar leaves the
+                    // app on "select a view" with no way back.
+                    let visible_count = self
+                        .nav_order
+                        .iter()
+                        .filter(|p| !self.nav_hidden.contains(p))
+                        .count();
+                    if visible_count > 1 {
+                        self.nav_hidden.push(page);
+                    }
+                }
+                self.rebuild_nav();
+                return self.update_title();
+            }
+            Message::EnableAutostart => {
+                return cosmic::task::future(async move {
+                    // Blocking: the portal round-trip waits on a Response
+                    // signal, so it must not run on the event loop.
+                    let granted = tokio::task::spawn_blocking(|| {
+                        crate::autostart::request(crate::autostart::DAEMON_COMMAND)
+                    })
+                    .await
+                    .map(|r| r.unwrap_or(false))
+                    .unwrap_or(false);
+                    cosmic::Action::App(Message::AutostartResult(granted))
+                });
+            }
+            Message::AutostartResult(granted) => {
+                let text = if granted {
+                    fl!("autostart-enabled")
+                } else {
+                    fl!("autostart-denied")
+                };
+                return self.toasts.push(toaster::Toast::new(text)).map(cosmic::action::app);
+            }
+
+            Message::ShowSettings => {
+                self.show_settings = true;
+                // Nothing else should be competing for the window.
+                self.core.window.show_context = false;
+                self.show_palette = false;
+            }
+
+            Message::NavStartDrag(index) => {
+                self.nav_pre_drag = self.nav_order.clone();
+                self.nav_dragging = Some(index);
+            }
+            Message::NavReorder(from, to) => {
+                if from < self.nav_order.len() && to <= self.nav_order.len() && from != to {
+                    let page = self.nav_order.remove(from);
+                    let insert_at = if to > from { to - 1 } else { to };
+                    let insert_at = insert_at.min(self.nav_order.len());
+                    self.nav_order.insert(insert_at, page);
+                    self.nav_dragging = Some(insert_at);
+                    self.rebuild_nav();
+                }
+            }
+            Message::NavFinishDrag => {
+                self.nav_dragging = None;
+                self.nav_pre_drag.clear();
+            }
+            Message::NavCancelDrag => {
+                // Restore by id order: the list has already been mutated in
+                // place by the Reorder messages seen during the drag.
+                if !self.nav_pre_drag.is_empty() {
+                    self.nav_order = std::mem::take(&mut self.nav_pre_drag);
+                    self.rebuild_nav();
+                }
+                self.nav_dragging = None;
+            }
+
+            Message::UpdateRuntime(ref runtime) => {
+                // Mirror the daemon's state into the fields the alarm views
+                // already read, so nothing downstream has to know the schedule
+                // moved out of process.
+                self.alarm.ringing = runtime
+                    .ringing
+                    .iter()
+                    .map(|r| alarm::RingingAlarm {
+                        alarm_id: r.alarm_id,
+                        label: r.label.clone(),
+                        sound: r.sound.clone(),
+                        ring_secs: r.ring_secs,
+                        snooze_minutes: r.snooze_minutes,
+                        // Only the daemon expires a ring, so this is display-only.
+                        started_at: std::time::Instant::now(),
+                    })
+                    .collect();
+                self.alarm.snoozed = runtime
+                    .snoozed
+                    .iter()
+                    .map(|s| alarm::SnoozedAlarm {
+                        alarm_id: s.alarm_id,
+                        label: s.label.clone(),
+                        sound: s.sound.clone(),
+                        ring_minutes: s.ring_minutes,
+                        snooze_minutes: s.snooze_minutes,
+                        retrigger_at: s.retrigger_at,
+                    })
+                    .collect();
+                // A spent one-shot reads as off. The daemon clears the flag once
+                // the user switches the alarm back on.
+                for id in &runtime.consumed_once {
+                    if let Some(a) = self.alarm.alarms.iter_mut().find(|a| a.id == *id) {
+                        a.is_enabled = false;
+                    }
+                }
+
+                // Project the daemon's timer runs onto the fields the timer
+                // views already read, so nothing downstream knows the countdown
+                // moved out of process.
+                let now = chrono::Local::now();
+                for entry in &mut self.timer.timers {
+                    match runtime.timer(entry.id) {
+                        Some(run) => {
+                            entry.is_running = run.is_running();
+                            entry.remaining =
+                                std::time::Duration::from_secs(run.remaining_secs(now));
+                            entry.completed_count = run.completed;
+                        }
+                        None => {
+                            entry.is_running = false;
+                            entry.remaining = entry.initial_duration;
+                            entry.completed_count = 0;
+                        }
+                    }
+                }
+                for entry in &mut self.pomodoro.timers {
+                    match runtime.pomodoro(entry.id) {
+                        Some(run) => {
+                            entry.is_running = run.is_running();
+                            entry.remaining =
+                                std::time::Duration::from_secs(run.remaining_secs(now));
+                            entry.session_type = match run.session {
+                                crate::runtime::SessionKind::Work => {
+                                    pomodoro::SessionType::Work
+                                }
+                                crate::runtime::SessionKind::ShortBreak => {
+                                    pomodoro::SessionType::ShortBreak
+                                }
+                                crate::runtime::SessionKind::LongBreak => {
+                                    pomodoro::SessionType::LongBreak
+                                }
+                            };
+                            entry.session_number = run.session_number;
+                            entry.completed_work_sessions = run.completed_work_sessions;
+                        }
+                        // No run: either never started, or reset. Restore the
+                        // opening state -- clearing only `is_running` would
+                        // leave a reset pomodoro frozen mid-session.
+                        //
+                        // Field-wise rather than rebuilding the entry, so the
+                        // label, durations and custom sound survive.
+                        None => {
+                            let work = std::time::Duration::from_secs(
+                                u64::from(entry.work_minutes) * 60,
+                            );
+                            entry.session_number = 1;
+                            entry.session_type = pomodoro::SessionType::Work;
+                            entry.remaining = work;
+                            entry.started_remaining = work;
+                            entry.is_running = false;
+                            entry.start_instant = None;
+                            entry.completed_work_sessions = 0;
+                            entry.total_focused_secs = 0;
+                        }
+                    }
+                }
+
+                for event in &mut self.countdown.events {
+                    event.fired = event
+                        .reminders
+                        .iter()
+                        .copied()
+                        .filter(|r| runtime.was_delivered(event.id, r.key()))
+                        .collect();
+                    event.arrived = runtime
+                        .was_delivered(event.id, crate::runtime::CountdownDelivery::ARRIVED);
+                }
+
+                // Daily stats are ours to write, so fold in whatever the daemon
+                // banked while we were closed and tell it to clear the counter.
+                let banked: Vec<(u32, u64)> = runtime
+                    .pomodoro
+                    .iter()
+                    .filter(|p| p.unrecorded_focus_secs > 0)
+                    .map(|p| (p.timer_id, p.unrecorded_focus_secs))
+                    .collect();
+                for (timer_id, secs) in banked {
+                    self.pomodoro.record_completed_work(secs);
+                    daemon_call(move || crate::ipc::pomodoro_focus_recorded(timer_id, secs));
+                }
+
+                self.runtime = runtime.clone();
+            }
+
+            Message::OpenPalette => {
+                self.show_palette = true;
+                self.palette_input.clear();
+                // Close anything that would fight the palette for focus.
+                self.core.window.show_context = false;
                 self.show_shortcuts_dialog = false;
+                return widget::text_input::focus(widget::Id::new("palette-input"));
+            }
+            Message::ClosePalette => {
+                self.show_palette = false;
+                self.palette_input.clear();
+            }
+            Message::PaletteInput(text) => {
+                self.palette_input = text;
+            }
+            Message::PaletteSubmit => {
+                let action = crate::quick_action::parse(&self.palette_input);
+                self.show_palette = false;
+                self.palette_input.clear();
+                if let Some(action) = action {
+                    return self.run_quick_action(action);
+                }
+            }
+
+            Message::PaletteRun(action) => {
+                self.show_palette = false;
+                self.palette_input.clear();
+                return self.run_quick_action(action);
+            }
+
+            Message::CloseShortcutsDialog => {
+                // Escape is a general "back out of the current thing". The
+                // shortcuts dialog takes priority; otherwise it leaves the focus
+                // mode of whichever page is showing one.
+                if self.show_shortcuts_dialog {
+                    self.show_shortcuts_dialog = false;
+                } else if self.show_settings {
+                    self.show_settings = false;
+                } else {
+                    match self.nav.active_data::<Page>() {
+                        Some(Page::Timer) => self.timer.focused_id = None,
+                        Some(Page::Workout) => self.workout.focused_id = None,
+                        Some(Page::Pomodoro) => self.pomodoro.focused_id = None,
+                        Some(Page::WorldClocks) => self.world_clocks.selected_clock_id = None,
+                        _ => {}
+                    }
+                }
             }
 
             Message::ConfirmDestructiveAction => {
@@ -762,6 +1199,7 @@ impl cosmic::Application for AppModel {
                         }
                     }
                     Some(DestructiveAction::DeleteTimer(id)) => {
+                        daemon_call(move || crate::ipc::timer_reset(id));
                         self.timer.update(timer::Message::DeleteTimer(id));
                         if self.context_page == ContextPage::TimerAdd {
                             self.timer.editing = false;
@@ -772,6 +1210,7 @@ impl cosmic::Application for AppModel {
                         self.world_clocks.update(world_clocks::Message::RemoveClock(id));
                     }
                     Some(DestructiveAction::DeletePomodoro(id)) => {
+                        daemon_call(move || crate::ipc::pomodoro_reset(id));
                         self.pomodoro.update(pomodoro::Message::Delete(id));
                     }
                     Some(DestructiveAction::ClearStopwatchHistory) => {
@@ -852,9 +1291,47 @@ impl cosmic::Application for AppModel {
         Task::none()
     }
 
+    /// Another `clocks` invocation handed us its arguments instead of starting a
+    /// second window. That is how a notification click reaches an app that was
+    /// already open.
+    fn dbus_activation(
+        &mut self,
+        msg: cosmic::dbus_activation::Message,
+    ) -> Task<cosmic::Action<Self::Message>> {
+        if let cosmic::dbus_activation::Details::ActivateAction { args, .. } = msg.msg
+            && let Some(page) = args.first().and_then(|key| Page::from_key(key))
+        {
+            self.activate_page(page);
+            self.core.window.show_context = false;
+            return self.update_title();
+        }
+        Task::none()
+    }
+
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Self::Message>> {
         self.nav.activate(id);
         self.core.window.show_context = false;
+        // Settings renders ahead of the nav page, so without this a sidebar
+        // click would move the highlight and change nothing on screen. The
+        // sidebar is how you leave settings.
+        self.show_settings = false;
         self.update_title()
     }
+}
+
+/// Keyboard shortcuts shown beside menu items.
+///
+/// `menu::items` looks each action up here and renders the binding; an empty map
+/// means the menu shows no shortcuts at all. These must be kept in step with the
+/// real bindings in `subscriptions::input_subscription`.
+fn key_binds() -> HashMap<menu::KeyBind, MenuAction> {
+    let mut binds = HashMap::new();
+    binds.insert(
+        menu::KeyBind {
+            modifiers: vec![menu::key_bind::Modifier::Ctrl],
+            key: cosmic::iced::keyboard::Key::Character("k".into()),
+        },
+        MenuAction::QuickAction,
+    );
+    binds
 }
