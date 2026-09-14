@@ -25,7 +25,7 @@ jobs:
       - name: Checkout Flathub manifest repo
         uses: actions/checkout@v4
         with:
-          repository: flathub/dev.th3jk.clocks
+          repository: flathub/dev.sramek.clocks
           path: flathub
           token: ${{ secrets.FLATHUB_PAT }}
 
@@ -47,7 +47,7 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ steps.release_sha.outputs.sha }}
         run: |
-          MANIFEST="dev.th3jk.clocks.json"
+          MANIFEST="dev.sramek.clocks.json"
 
           jq --arg commit "$RELEASE_COMMIT" \
              '(.modules[] | select(.name == "clocks") | .sources) |=

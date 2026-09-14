@@ -43,7 +43,7 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: clocks.flatpak
-          manifest-path: .flatpak/dev.th3jk.clocks.yml
+          manifest-path: .flatpak/dev.sramek.clocks.yml
           cache-key: flatpak-builder-${{ github.sha }}
           # Keeps the build going when the runtime is already cached.
           restore-cache: true

@@ -395,7 +395,7 @@ fn notify_opening(page: clocks::pages::Page, summary: String, body: String) {
 
 struct DaemonInterface(Arc<Daemon>);
 
-#[zbus::interface(name = "dev.th3jk.clocks.Daemon")]
+#[zbus::interface(name = "dev.sramek.clocks.Daemon")]
 impl DaemonInterface {
     fn dismiss(&self, alarm_id: u32) {
         self.0.answer_dismiss(alarm_id);

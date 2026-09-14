@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>dev.th3jk.clocks</id>
+  <id>dev.sramek.clocks</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Clocks</name>
@@ -28,13 +28,13 @@
       clocks you actually use.
     </p>
   </description>
-  <developer id="dev.th3jk">
+  <developer id="dev.sramek">
     <name>th3jk</name>
   </developer>
   <url type="homepage">https://github.com/Th3JK/clocks</url>
   <url type="vcs-browser">https://github.com/Th3JK/clocks</url>
   <url type="bugtracker">https://github.com/Th3JK/clocks/issues</url>
-  <launchable type="desktop-id">dev.th3jk.clocks.desktop</launchable>
+  <launchable type="desktop-id">dev.sramek.clocks.desktop</launchable>
   <provides>
     <binary>clocks</binary>
   </provides>
