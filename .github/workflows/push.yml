@@ -14,11 +14,22 @@ jobs:
       checks: write
       pull-requests: write
     steps:
-      - name: Install depencencies
-        run: sudo apt-get install -y libxkbcommon-dev
+      # Keep in step with pr.yml: a dependency missing only here means main
+      # goes red after a merge that passed its own checks, which is exactly
+      # how this broke.
+      #
+      # libasound2-dev is alsa-sys's build requirement, pulled in by rodio for
+      # alarm and timer playback -- without it the build fails in a build script
+      # rather than at link time, which makes it look unrelated to audio.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libasound2-dev libudev-dev
       - uses: actions/checkout@v4
       - name: Build
         run: cargo build --verbose
+      - name: Test
+        run: cargo test --verbose
       - name: clippy
         uses: auguwu/clippy-action@1.4.0
         with:
