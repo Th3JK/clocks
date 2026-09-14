@@ -1,7 +1,7 @@
 # Name of the application's binary.
 name := 'clocks'
 # The unique ID of the application.
-appid := 'dev.th3jk.clocks'
+appid := 'dev.sramek.clocks'
 
 # Path to root file system, which defaults to `/`.
 rootdir := ''
@@ -94,7 +94,7 @@ install-local:
 install-daemon-local profile='debug':
     cargo build {{ if profile == 'release' { '--release' } else { '' } }} --bin {{daemon-name}}
     mkdir -p {{ local-data-dir / 'dbus-1' / 'services' }}
-    printf '[D-BUS Service]\nName=dev.th3jk.clocks.Daemon\nExec=%s\n' \
+    printf '[D-BUS Service]\nName=dev.sramek.clocks.Daemon\nExec=%s\n' \
         {{ absolute_path(cargo-target-dir / profile / daemon-name) }} \
         > {{ local-data-dir / 'dbus-1' / 'services' / (appid + '.Daemon.service') }}
     mkdir -p {{ env('XDG_CONFIG_HOME', env('HOME') + '/.config') / 'autostart' }}

@@ -1,6 +1,6 @@
 # Manifest for CI builds only.
 #
-# The shipped manifest lives in the separate flathub/dev.th3jk.clocks repo and
+# The shipped manifest lives in the separate flathub/dev.sramek.clocks repo and
 # pins the app module to a released git commit. This one builds the *checked-out
 # working tree* (`type: dir`) so a pull request can be built and tested before it
 # is merged.
@@ -8,7 +8,7 @@
 # Keep the finish-args here in step with the Flathub manifest -- they are the
 # app's actual sandbox requirements, and a permission missing there will not show
 # up in CI, which is exactly the failure this file exists to catch.
-app-id: dev.th3jk.clocks
+app-id: dev.sramek.clocks
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
@@ -19,6 +19,15 @@ sdk-extensions:
   - org.freedesktop.Sdk.Extension.llvm20
 command: clocks
 
+# Two things deliberately absent, because Flatpak grants them already and
+# flatpak-builder-lint rejects them as redundant:
+#
+#   --talk-name=org.freedesktop.portal.*  portal interfaces are always allowed
+#   --own-name=dev.sramek.clocks[.*]      the app owns its own id and subnames,
+#                                         the daemon's bus name included
+#
+# The last two entries below are the ones Flathub does not grant by default and
+# that need an exception on submission; each carries its justification.
 finish-args:
   - --share=ipc
   - --socket=wayland
@@ -29,8 +38,6 @@ finish-args:
   - --socket=pulseaudio
   # notify-rust posts straight to the session bus.
   - --talk-name=org.freedesktop.Notifications
-  # The Background portal, for autostart, and the file chooser for custom sounds.
-  - --talk-name=org.freedesktop.portal.Desktop
   # cosmic-config watches for changes through the settings daemon.
   - --talk-name=com.system76.CosmicSettingsDaemon
   # Read-only sight of the host's COSMIC config, which is where the theme lives.
@@ -53,10 +60,6 @@ finish-args:
   # Scoped to the autostart directory, not xdg-config, and written only when the
   # user presses "Start automatically".
   - --filesystem=xdg-config/autostart:create
-  # The GUI's single-instance name, and the daemon's own interface. Without the
-  # second the daemon cannot claim its bus name and D-Bus activation fails.
-  - --own-name=dev.th3jk.clocks
-  - --own-name=dev.th3jk.clocks.Daemon
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm20/bin
@@ -72,18 +75,18 @@ modules:
       - cargo --offline build --release --verbose
       - install -Dm0755 target/release/clocks /app/bin/clocks
       - install -Dm0755 target/release/clocks-daemon /app/bin/clocks-daemon
-      - install -Dm0644 resources/app.desktop /app/share/applications/dev.th3jk.clocks.desktop
-      - install -Dm0644 resources/app.metainfo.xml /app/share/metainfo/dev.th3jk.clocks.metainfo.xml
+      - install -Dm0644 resources/app.desktop /app/share/applications/dev.sramek.clocks.desktop
+      - install -Dm0644 resources/app.metainfo.xml /app/share/metainfo/dev.sramek.clocks.metainfo.xml
       - install -Dm0644 resources/icons/hicolor/scalable/apps/icon.svg
-        /app/share/icons/hicolor/scalable/apps/dev.th3jk.clocks.svg
+        /app/share/icons/hicolor/scalable/apps/dev.sramek.clocks.svg
       - install -Dm0644 -t /app/share/clocks/audio resources/audio/*.wav
       # D-Bus activation, so the GUI can start the daemon on demand. Written
       # here rather than copied from resources/: the host file points at
       # /usr/bin, and inside the sandbox the binary is at /app/bin. The name
       # matches `$APP_ID.*.service`, which is what Flatpak exports.
       - install -d /app/share/dbus-1/services
-      - printf '[D-BUS Service]\nName=dev.th3jk.clocks.Daemon\nExec=/app/bin/clocks-daemon\n'
-        > /app/share/dbus-1/services/dev.th3jk.clocks.Daemon.service
+      - printf '[D-BUS Service]\nName=dev.sramek.clocks.Daemon\nExec=/app/bin/clocks-daemon\n'
+        > /app/share/dbus-1/services/dev.sramek.clocks.Daemon.service
     sources:
       - type: dir
         path: ..

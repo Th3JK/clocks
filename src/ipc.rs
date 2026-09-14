@@ -10,9 +10,9 @@
 
 /// Well-known bus name. Distinct from the name libcosmic's `single-instance`
 /// feature claims for the GUI, which is [`crate::APP_ID`] itself.
-pub const DAEMON_BUS_NAME: &str = "dev.th3jk.clocks.Daemon";
-pub const DAEMON_PATH: &str = "/dev/th3jk/clocks/Daemon";
-pub const DAEMON_INTERFACE: &str = "dev.th3jk.clocks.Daemon";
+pub const DAEMON_BUS_NAME: &str = "dev.sramek.clocks.Daemon";
+pub const DAEMON_PATH: &str = "/dev/sramek/clocks/Daemon";
+pub const DAEMON_INTERFACE: &str = "dev.sramek.clocks.Daemon";
 
 /// Call a no-argument-plus-id method on the daemon, starting it if it is not
 /// already running.

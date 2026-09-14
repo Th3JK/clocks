@@ -9,7 +9,7 @@
 
 /// D-Bus name, config id and state id. Shared so the GUI and the daemon cannot
 /// drift apart on which config they are talking about.
-pub const APP_ID: &str = "dev.th3jk.clocks";
+pub const APP_ID: &str = "dev.sramek.clocks";
 
 pub mod app;
 pub mod audio;

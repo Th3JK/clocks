@@ -50,7 +50,7 @@ impl cosmic::Application for AppModel {
     type Flags = crate::flags::Flags;
     type Message = Message;
 
-    const APP_ID: &'static str = "dev.th3jk.clocks";
+    const APP_ID: &'static str = "dev.sramek.clocks";
 
     fn core(&self) -> &cosmic::Core {
         &self.core

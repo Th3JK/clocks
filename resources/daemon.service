@@ -1,5 +1,5 @@
 [D-BUS Service]
-Name=dev.th3jk.clocks.Daemon
+Name=dev.sramek.clocks.Daemon
 Exec=/usr/bin/clocks-daemon
 # Picked up automatically where systemd runs the user session, ignored
 # everywhere else. The daemon does not depend on it -- plain D-Bus activation

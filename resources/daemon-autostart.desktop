@@ -3,7 +3,7 @@ Type=Application
 Name=Clocks alarms
 Comment=Rings alarms while Clocks is closed
 Exec=clocks-daemon
-Icon=dev.th3jk.clocks
+Icon=dev.sramek.clocks
 Terminal=false
 # Background service, not something to show in a launcher.
 NoDisplay=true
